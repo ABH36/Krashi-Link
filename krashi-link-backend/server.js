@@ -22,7 +22,7 @@ const notificationRoutes = require('./src/routes/notifications');
 
 // Import middleware
 const errorHandler = require('./src/middlewares/errorHandler');
-const sanitize = require('./src/middlewares/sanitize'); // Ensure this file exists
+const sanitize = require('./src/middlewares/sanitize'); 
 const { generalLimiter, authLimiter, otpLimiter } = require('./src/middlewares/rateLimit');
 
 const app = express();
@@ -31,17 +31,18 @@ const server = http.createServer(app);
 // ✅ Connect to Database
 connectDB();
 
-// ✅ CORS Configuration (Flexible for Vercel & Localhost)
-// जब आप Vercel पर डिप्लॉय कर लें, तो उस URL को .env में डाल सकते हैं
+// ✅ SECURITY: CORS Origin Logic
+// Render Variable se allow list banayega
 const allowedOrigins = process.env.CORS_ALLOWED_ORIGINS 
   ? process.env.CORS_ALLOWED_ORIGINS.split(',') 
-  : ['http://localhost:3000', 'http://localhost:5000']; 
+  : ['http://localhost:3000', 'http://localhost:5000'];
 
-// ✅ Socket.io Setup
+console.log("🔒 Allowed Origins:", allowedOrigins); // Render Logs me dikhega ki kaun allow hai
+
+// ✅ Socket.io Setup (Secure)
 const io = socketIo(server, {
   cors: {
-    // फ़िलहाल true रखें ताकि Vercel से connection रिजेक्ट न हो
-    origin: true, 
+    origin: allowedOrigins, // Ab sirf Vercel aur Localhost connect kar payenge
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     credentials: true
   }
@@ -63,17 +64,25 @@ app.use(helmet({
 }));
 app.use(compression());
 
-// ✅ Express CORS Setup
+// ✅ Express CORS Setup (Secure)
 app.use(cors({
-  origin: true, // Allow requests from any origin (Temporarily for smooth deployment)
-  credentials: true // Cookies/Headers allow karne ke liye
+  origin: (origin, callback) => {
+    // !origin allow karta hai mobile apps ya server-to-server calls ko
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.log(`❌ Blocked by CORS: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
 }));
 
 // Apply rate limiting
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 app.use('/api/bookings/*/verify-*', otpLimiter);
-// app.use('/api/', generalLimiter); // Commented out temporarily to prevent blocking during testing
+// app.use('/api/', generalLimiter); // Commented temporarily
 
 // Logging
 app.use(morgan('combined'));
@@ -90,7 +99,7 @@ app.use('/api/reviews', reviewRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
 
-// ✅ Health Check Endpoint (Render Ping ke liye)
+// ✅ Health Check Endpoint
 app.get('/api/health', (req, res) => {
   res.status(200).json({
     success: true,
@@ -100,21 +109,18 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// ❌ REMOVED: Frontend Static Serving Logic
-// (Kyunki Frontend Vercel par hoga, Render par nahi)
-
 // Error Handling Middleware
 app.use(errorHandler);
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err, promise) => {
   console.log('Unhandled Rejection at:', promise, 'reason:', err);
-  // Production me server crash hone se bachayein (Optional)
   // server.close(() => process.exit(1));
 });
 
 const PORT = process.env.PORT || 5000;
 
+// Listen on 0.0.0.0 for Render
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Krishi-Link Server running on port ${PORT}`);
   console.log(`🌱 Environment: ${process.env.NODE_ENV || 'development'}`);
