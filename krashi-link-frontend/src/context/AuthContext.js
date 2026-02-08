@@ -27,7 +27,12 @@ export const AuthProvider = ({ children }) => {
       // Verify token is still valid
       authService.getMe()
         .then(response => {
-          setUser(response.data.user);
+          // Robust checking for data structure
+          const data = response.data || response;
+          if (data && data.user) {
+             setUser(data.user);
+             localStorage.setItem('user', JSON.stringify(data.user));
+          }
         })
         .catch(() => {
           logout();
@@ -47,17 +52,22 @@ export const AuthProvider = ({ children }) => {
       
       const response = await authService.login(phone, password);
       
-      if (response.success) {
-        const { token, user } = response.data;
-        
+      // ✅ FIX: Robust data handling (Handles if response is wrapped or direct)
+      const data = response.data || response;
+      const token = data.token || response.token;
+      const user = data.user || response.user;
+      
+      if (token && user) {
         localStorage.setItem('token', token);
         localStorage.setItem('user', JSON.stringify(user));
         setUser(user);
         
         return { success: true };
+      } else {
+         throw new Error('Invalid server response');
       }
     } catch (error) {
-      const message = error.response?.data?.error?.message || 'Login failed';
+      const message = error.response?.data?.error?.message || error.message || 'Login failed';
       setError(message);
       return { success: false, message };
     } finally {
@@ -72,17 +82,24 @@ export const AuthProvider = ({ children }) => {
       
       const response = await authService.register(userData);
       
-      if (response.success) {
-        const { token, user } = response.data;
-        
+      // ✅ FIX: Robust data handling
+      const data = response.data || response;
+      const token = data.token || response.token;
+      const user = data.user || response.user;
+      
+      if (token && user) {
         localStorage.setItem('token', token);
         localStorage.setItem('user', JSON.stringify(user));
         setUser(user);
         
         return { success: true };
+      } else {
+         // Agar success hai par token nahi aaya (rare case), to success return karo
+         // Register.js isse handle kar lega
+         return { success: true, message: 'Registration successful' };
       }
     } catch (error) {
-      const message = error.response?.data?.error?.message || 'Registration failed';
+      const message = error.response?.data?.error?.message || error.message || 'Registration failed';
       setError(message);
       return { success: false, message };
     } finally {

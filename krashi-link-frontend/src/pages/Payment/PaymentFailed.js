@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { useLocation, useNavigate, Link } from 'react-router-dom';
-import { XMarkIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { XCircleIcon, ArrowPathIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
 
 const PaymentFailed = () => {
   const location = useLocation();
@@ -8,9 +8,7 @@ const PaymentFailed = () => {
   const [failureDetails, setFailureDetails] = useState(null);
 
   useEffect(() => {
-    if (location.state) {
-      setFailureDetails(location.state);
-    }
+    if (location.state) setFailureDetails(location.state);
   }, [location]);
 
   const handleRetry = () => {
@@ -21,81 +19,74 @@ const PaymentFailed = () => {
     }
   };
 
+  const handleWhatsAppSupport = () => {
+    const message = `Hi Support, my payment failed for Booking ID: ${failureDetails?.bookingId || 'Unknown'}. Please help.`;
+    window.open(`https://wa.me/919876543210?text=${encodeURIComponent(message)}`, '_blank');
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-md mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center">
-          {/* Failure Icon */}
-          <div className="mx-auto flex items-center justify-center h-24 w-24 rounded-full bg-red-100 mb-6">
-            <XMarkIcon className="h-12 w-12 text-red-600" />
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden animate-[shake_0.5s_ease-in-out]">
+        
+        {/* Header */}
+        <div className="bg-red-50 p-8 text-center border-b border-red-100">
+          <div className="mx-auto w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-4">
+            <XCircleIcon className="w-12 h-12 text-red-500" />
           </div>
-
-          {/* Failure Message */}
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Payment Failed
-          </h1>
-          <p className="text-gray-600 mb-4">
-            We couldn't process your payment. Please try again.
+          <h1 className="text-2xl font-bold text-gray-900">Payment Failed</h1>
+          <p className="text-gray-500 mt-2">
+            Don't worry, no money was deducted.
           </p>
+        </div>
 
+        {/* Details Body */}
+        <div className="p-6 space-y-6">
+          
           {failureDetails?.error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-              <p className="text-sm text-red-700">
-                {failureDetails.error}
-              </p>
+            <div className="bg-red-50 border border-red-100 rounded-xl p-4 flex items-start gap-3">
+               <div className="text-red-500 mt-0.5">⚠️</div>
+               <div>
+                   <p className="text-xs font-bold text-red-800 uppercase tracking-wide">Error Reason</p>
+                   <p className="text-sm text-red-700 mt-1">{failureDetails.error}</p>
+               </div>
             </div>
           )}
 
-          {/* Common Reasons */}
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 text-left">
-            <h3 className="text-sm font-medium text-yellow-800 mb-2">
-              Common reasons for failure:
-            </h3>
-            <ul className="text-sm text-yellow-700 space-y-1">
-              <li>• Insufficient funds in your account</li>
-              <li>• Incorrect card details entered</li>
-              <li>• Network connectivity issues</li>
-              <li>• Bank server downtime</li>
-              <li>• Transaction timeout</li>
-            </ul>
+          {/* Quick Tips (Simplified) */}
+          <div className="text-sm text-gray-600 space-y-2 bg-gray-50 p-4 rounded-xl">
+             <p className="font-semibold text-gray-800">Possible reasons:</p>
+             <ul className="list-disc pl-5 space-y-1">
+                <li>Bank server timed out</li>
+                <li>Incorrect card details or UPI PIN</li>
+                <li>Spending limit reached</li>
+             </ul>
           </div>
 
-          {/* Action Buttons */}
-          <div className="space-y-3">
+          {/* Actions */}
+          <div className="space-y-3 pt-2">
             <button
               onClick={handleRetry}
-              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 font-medium flex items-center justify-center"
+              className="w-full bg-red-600 text-white py-3.5 px-4 rounded-xl font-bold shadow-lg shadow-red-200 hover:bg-red-700 hover:shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2"
             >
-              <ArrowPathIcon className="w-5 h-5 mr-2" />
-              Try Payment Again
+              <ArrowPathIcon className="w-5 h-5" />
+              Try Again
             </button>
             
-            <Link
-              to="/farmer/bookings"
-              className="block w-full border border-gray-300 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-50 font-medium text-center"
+            <button
+              onClick={handleWhatsAppSupport}
+              className="w-full bg-green-50 text-green-700 py-3.5 px-4 rounded-xl font-bold border border-green-200 hover:bg-green-100 transition-colors flex items-center justify-center gap-2"
             >
-              Back to My Bookings
-            </Link>
-            
-            <div className="pt-4">
-              <p className="text-sm text-gray-600">
-                Need help?{' '}
-                <a 
-                  href="mailto:support@krashilink.com" 
-                  className="text-blue-600 hover:text-blue-500 font-medium"
-                >
-                  Contact Support
-                </a>
-              </p>
-            </div>
+              <ChatBubbleLeftRightIcon className="w-5 h-5" />
+              Chat with Support
+            </button>
           </div>
 
-          {/* Security Notice */}
-          <div className="mt-8 p-4 bg-gray-100 rounded-lg">
-            <p className="text-xs text-gray-600">
-              💡 <strong>Tip:</strong> Ensure your card has sufficient funds and try using a different payment method if the issue persists.
-            </p>
-          </div>
+          <button 
+            onClick={() => navigate('/farmer/bookings')}
+            className="w-full text-center text-sm text-gray-400 hover:text-gray-600"
+          >
+            Cancel & Return to Home
+          </button>
         </div>
       </div>
     </div>

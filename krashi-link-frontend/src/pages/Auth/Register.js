@@ -1,13 +1,23 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useLocale } from '../../context/LocaleContext';
 import { useTranslation } from 'react-i18next';
 import Button from '../../components/common/Button';
 import Loader from '../../components/common/Loader';
+import { 
+  UserIcon, 
+  PhoneIcon, 
+  LockClosedIcon, 
+  EyeIcon, 
+  EyeSlashIcon,
+  WrenchScrewdriverIcon, 
+  SunIcon 
+} from '@heroicons/react/24/outline';
 
 const Register = () => {
-  const { register, loading, error, clearError, isAuthenticated } = useAuth();
+  // ✅ login function bhi nikala context se (Auto-login ke liye)
+  const { register, login, logout, loading, error, clearError } = useAuth();
   const { isHindi } = useLocale();
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -21,27 +31,14 @@ const Register = () => {
   });
 
   const [validationErrors, setValidationErrors] = useState({});
+  const [showPassword, setShowPassword] = useState(false);
 
-  // --- CUSTOM DROPDOWN STATE ---
-  const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
-  const roleDropdownRef = useRef(null);
-
-  // Close dropdown when clicking outside
+  // Page load hone par purana session clear karein
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (roleDropdownRef.current && !roleDropdownRef.current.contains(event.target)) {
-        setIsRoleDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigate('/');
-    }
-  }, [isAuthenticated, navigate]);
+    logout(); 
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+  }, []); 
 
   useEffect(() => {
     clearError();
@@ -49,282 +46,202 @@ const Register = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    
-    if (validationErrors[name]) {
-      setValidationErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
-    }
-    
+    setFormData(prev => ({ ...prev, [name]: value }));
+    if (validationErrors[name]) setValidationErrors(prev => ({ ...prev, [name]: '' }));
     if (error) clearError();
-  };
-
-  // Helper for Custom Dropdown Selection
-  const handleRoleSelect = (roleValue) => {
-    setFormData(prev => ({
-      ...prev,
-      role: roleValue
-    }));
-    setIsRoleDropdownOpen(false);
-    
-    // Clear validation error if any
-    if (validationErrors.role) {
-      setValidationErrors(prev => ({ ...prev, role: '' }));
-    }
   };
 
   const validateForm = () => {
     const errors = {};
-
-    if (!formData.name.trim()) {
-      errors.name = t('auth.validation.nameRequired');
-    } else if (formData.name.trim().length < 2) {
-      errors.name = t('auth.validation.nameMin');
-    }
-
-    if (!formData.phone) {
-      errors.phone = t('auth.validation.phoneRequired');
-    } else if (!/^[6-9]\d{9}$/.test(formData.phone)) {
-      errors.phone = t('auth.validation.phoneInvalid');
-    }
-
-    if (!formData.password) {
-      errors.password = t('auth.validation.passwordRequired');
-    } else if (formData.password.length < 6) {
-      errors.password = t('auth.validation.passwordMin');
-    }
-
-    if (formData.password !== formData.confirmPassword) {
-      errors.confirmPassword = 'Passwords do not match';
-    }
-
-    if (!formData.role) {
-      errors.role = t('auth.validation.roleRequired');
-    }
-
+    if (!formData.name.trim()) errors.name = t('auth.validation.nameRequired');
+    if (!formData.phone) errors.phone = t('auth.validation.phoneRequired');
+    else if (!/^[6-9]\d{9}$/.test(formData.phone)) errors.phone = t('auth.validation.phoneInvalid');
+    
+    if (!formData.password) errors.password = t('auth.validation.passwordRequired');
+    else if (formData.password.length < 6) errors.password = t('auth.validation.passwordMin');
+    
+    if (formData.password !== formData.confirmPassword) errors.confirmPassword = 'Passwords do not match';
+    
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!validateForm()) return;
     
-    if (!validateForm()) {
-      return;
-    }
-
     const { confirmPassword, ...registerData } = formData;
-    const result = await register(registerData);
     
-    if (result.success) {
-      navigate('/');
+    // Step 1: Register API Call
+    const regResult = await register(registerData);
+    
+    if (regResult && regResult.success) {
+        // ✅ FIX: Auto-Login immediately after Register
+        // Agar backend register ke sath token nahi bhejta, to ye step token le aayega
+        const loginResult = await login(formData.phone, formData.password);
+
+        if (loginResult.success) {
+             const targetPath = formData.role === 'owner' ? '/owner/dashboard' : '/farmer/dashboard';
+             
+             // Hard Redirect to ensure clean state load
+             window.location.href = targetPath;
+        }
     }
   };
 
-  if (loading) {
-    return <Loader text={t('common.loading')} />;
-  }
-
-  // Role Options
-  const roleOptions = [
-    { value: 'farmer', label: t('auth.farmer') },
-    { value: 'owner', label: t('auth.owner') }
-  ];
-
-  const getSelectedRoleLabel = () => {
-    const selected = roleOptions.find(r => r.value === formData.role);
-    return selected ? selected.label : t('auth.role');
-  };
+  if (loading) return <Loader text={t('common.loading')} />;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-green-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        {/* Header */}
-        <div className="text-center">
-          <div className="mx-auto w-16 h-16 bg-primary-600 rounded-full flex items-center justify-center mb-4 shadow-lg">
-            <span className="text-2xl font-bold text-white">कृषि</span>
-          </div>
-          <h2 className="text-3xl font-bold text-gray-900">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 via-white to-emerald-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full animate-[fadeIn_0.5s_ease-out]">
+        
+        <div className="text-center mb-8">
+          <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight">
             {t('auth.register')}
           </h2>
           <p className="mt-2 text-sm text-gray-600">
-            {t('app.tagline')}
+            Join the KrishiLink community today
           </p>
         </div>
 
-        {/* Form */}
-        <form className="mt-8 space-y-6 bg-white p-8 rounded-xl shadow-lg border border-gray-100" onSubmit={handleSubmit}>
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-              {error}
-            </div>
-          )}
-
-          <div className="space-y-4">
-            {/* Name Input */}
+        <div className="bg-white/80 backdrop-blur-xl p-8 rounded-3xl shadow-2xl border border-white/50">
+          <form className="space-y-6" onSubmit={handleSubmit}>
+            
+            {/* Role Selection */}
             <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-                {t('auth.name')}
-              </label>
-              <input
-                id="name"
-                name="name"
-                type="text"
-                required
-                className="input-field w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none transition-all"
-                placeholder={isHindi ? "आपका पूरा नाम" : "Your full name"}
-                value={formData.name}
-                onChange={handleChange}
-              />
-              {validationErrors.name && (
-                <p className="mt-1 text-sm text-red-600">{validationErrors.name}</p>
-              )}
-            </div>
-
-            {/* Phone Input */}
-            <div>
-              <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
-                {t('auth.phone')}
-              </label>
-              <input
-                id="phone"
-                name="phone"
-                type="tel"
-                required
-                className="input-field w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none transition-all"
-                placeholder={isHindi ? "९८७६५४३२१०" : "9876543210"}
-                value={formData.phone}
-                onChange={handleChange}
-                pattern="[6-9]\d{9}"
-                maxLength="10"
-              />
-              {validationErrors.phone && (
-                <p className="mt-1 text-sm text-red-600">{validationErrors.phone}</p>
-              )}
-            </div>
-
-            {/* ROLE SELECTOR (CUSTOM DROPDOWN - NO EXTERNAL ICONS) */}
-            <div ref={roleDropdownRef} className="relative">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t('auth.role')}
-              </label>
-              
-              <button
-                type="button"
-                onClick={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)}
-                className="w-full p-3 flex justify-between items-center border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-primary-500 outline-none transition-all text-gray-700 text-left"
-              >
-                <span>{getSelectedRoleLabel()}</span>
-                {/* SVG Arrow Icon */}
-                <svg 
-                  className={`w-5 h-5 text-gray-500 transition-transform duration-200 ${isRoleDropdownOpen ? 'rotate-180' : ''}`} 
-                  fill="none" 
-                  stroke="currentColor" 
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-
-              {isRoleDropdownOpen && (
-                <div className="absolute top-full left-0 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-50 overflow-hidden">
-                  {roleOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => handleRoleSelect(option.value)}
-                      className={`w-full text-left px-4 py-3 text-sm flex items-center justify-between hover:bg-primary-50 transition-colors ${formData.role === option.value ? 'bg-primary-50 text-primary-700 font-bold' : 'text-gray-700'}`}
+                <label className="block text-sm font-bold text-gray-700 mb-3 text-center uppercase tracking-wide">
+                    I am a...
+                </label>
+                <div className="grid grid-cols-2 gap-4">
+                    <div 
+                        onClick={() => setFormData(prev => ({ ...prev, role: 'farmer' }))}
+                        className={`cursor-pointer p-4 rounded-xl border-2 flex flex-col items-center justify-center transition-all duration-200 ${
+                            formData.role === 'farmer' 
+                            ? 'border-green-500 bg-green-50 text-green-700 shadow-md transform scale-105' 
+                            : 'border-gray-200 hover:border-green-200 text-gray-500'
+                        }`}
                     >
-                      {option.label}
-                      {/* Checkmark Icon (SVG) */}
-                      {formData.role === option.value && (
-                        <svg className="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                    </button>
-                  ))}
+                        <SunIcon className="w-8 h-8 mb-2" />
+                        <span className="font-bold">Farmer</span>
+                        <span className="text-[10px] opacity-75">Kisan</span>
+                    </div>
+
+                    <div 
+                        onClick={() => setFormData(prev => ({ ...prev, role: 'owner' }))}
+                        className={`cursor-pointer p-4 rounded-xl border-2 flex flex-col items-center justify-center transition-all duration-200 ${
+                            formData.role === 'owner' 
+                            ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md transform scale-105' 
+                            : 'border-gray-200 hover:border-blue-200 text-gray-500'
+                        }`}
+                    >
+                        <WrenchScrewdriverIcon className="w-8 h-8 mb-2" />
+                        <span className="font-bold">Owner</span>
+                        <span className="text-[10px] opacity-75">Machine Malik</span>
+                    </div>
                 </div>
-              )}
-
-              {validationErrors.role && (
-                <p className="mt-1 text-sm text-red-600">{validationErrors.role}</p>
-              )}
             </div>
 
-            {/* Password Input */}
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                {t('auth.password')}
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                className="input-field w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none transition-all"
-                placeholder="••••••••"
-                value={formData.password}
-                onChange={handleChange}
-                minLength="6"
-              />
-              {validationErrors.password && (
-                <p className="mt-1 text-sm text-red-600">{validationErrors.password}</p>
-              )}
+            {error && <div className="bg-red-50 text-red-700 p-3 rounded-lg text-sm">{error}</div>}
+
+            <div className="space-y-4">
+              {/* Name */}
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <UserIcon className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  name="name"
+                  type="text"
+                  required
+                  className="input-field pl-10 py-3 rounded-xl w-full border-gray-300"
+                  placeholder={isHindi ? "आपका पूरा नाम" : "Your full name"}
+                  value={formData.name}
+                  onChange={handleChange}
+                />
+                {validationErrors.name && <p className="mt-1 text-xs text-red-600">{validationErrors.name}</p>}
+              </div>
+
+              {/* Phone */}
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <PhoneIcon className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  name="phone"
+                  type="tel"
+                  required
+                  className="input-field pl-10 py-3 rounded-xl w-full border-gray-300"
+                  placeholder="9876543210"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  maxLength="10"
+                />
+                {validationErrors.phone && <p className="mt-1 text-xs text-red-600">{validationErrors.phone}</p>}
+              </div>
+
+              {/* Password */}
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <LockClosedIcon className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  className="input-field pl-10 pr-10 py-3 rounded-xl w-full border-gray-300"
+                  placeholder="Password (min 6 chars)"
+                  value={formData.password}
+                  onChange={handleChange}
+                />
+                <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400"
+                >
+                    {showPassword ? <EyeSlashIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                </button>
+                {validationErrors.password && <p className="mt-1 text-xs text-red-600">{validationErrors.password}</p>}
+              </div>
+
+              {/* Confirm Password */}
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <LockClosedIcon className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  name="confirmPassword"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  className="input-field pl-10 py-3 rounded-xl w-full border-gray-300"
+                  placeholder="Confirm Password"
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                />
+                {validationErrors.confirmPassword && <p className="mt-1 text-xs text-red-600">{validationErrors.confirmPassword}</p>}
+              </div>
             </div>
 
-            {/* Confirm Password Input */}
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
-                Confirm Password
-              </label>
-              <input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                required
-                className="input-field w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none transition-all"
-                placeholder="••••••••"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                minLength="6"
-              />
-              {validationErrors.confirmPassword && (
-                <p className="mt-1 text-sm text-red-600">{validationErrors.confirmPassword}</p>
-              )}
-            </div>
-          </div>
-
-          <div>
             <Button
               type="submit"
               variant="primary"
               size="lg"
               loading={loading}
               disabled={loading}
-              className="w-full"
+              className="w-full py-3.5 text-lg shadow-lg shadow-green-500/30 rounded-xl"
             >
               {t('auth.register')}
             </Button>
-          </div>
 
-          <div className="text-center">
-            <span className="text-sm text-gray-600">
-              {t('auth.haveAccount')}{' '}
-              <Link
-                to="/login"
-                className="font-medium text-primary-600 hover:text-primary-500 transition-colors underline"
-              >
-                {t('auth.login')}
-              </Link>
-            </span>
-          </div>
-        </form>
+            <div className="text-center">
+              <span className="text-sm text-gray-500">
+                {t('auth.haveAccount')}{' '}
+                <Link to="/login" className="font-bold text-green-600 hover:text-green-700 underline">
+                  {t('auth.login')}
+                </Link>
+              </span>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );

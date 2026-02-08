@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { useLocation, useNavigate, Link } from 'react-router-dom';
-import { CheckBadgeIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { CheckCircleIcon, StarIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 
 const PaymentSuccess = () => {
   const location = useLocation();
@@ -8,125 +8,86 @@ const PaymentSuccess = () => {
   const [paymentDetails, setPaymentDetails] = useState(null);
 
   useEffect(() => {
-    if (location.state) {
-      setPaymentDetails(location.state);
-    } else {
-      // If no state, redirect to bookings
-      navigate('/farmer/bookings');
-    }
+    if (location.state) setPaymentDetails(location.state);
+    else navigate('/farmer/bookings');
   }, [location, navigate]);
 
-  const handleReview = () => {
-    if (paymentDetails?.bookingId) {
-      navigate(`/farmer/review/${paymentDetails.bookingId}`);
-    }
+  const handlePrint = () => {
+    window.print();
   };
 
-  if (!paymentDetails) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading payment details...</p>
-        </div>
-      </div>
-    );
-  }
+  if (!paymentDetails) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-md mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center">
-          {/* Success Icon */}
-          <div className="mx-auto flex items-center justify-center h-24 w-24 rounded-full bg-green-100 mb-6">
-            <CheckBadgeIcon className="h-12 w-12 text-green-600" />
-          </div>
+    <div className="min-h-screen bg-green-50 flex items-center justify-center p-4">
+      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden relative animate-[scaleIn_0.3s_ease-out]">
+        
+        {/* Success Header */}
+        <div className="bg-green-600 p-8 text-center text-white relative overflow-hidden">
+           <div className="absolute top-0 left-0 w-full h-full bg-white/10 pattern-dots"></div>
+           <div className="relative z-10">
+               <div className="mx-auto bg-white text-green-600 rounded-full w-20 h-20 flex items-center justify-center mb-4 shadow-lg animate-bounce">
+                   <CheckCircleIcon className="w-12 h-12" />
+               </div>
+               <h1 className="text-2xl font-bold">Payment Successful!</h1>
+               <p className="text-green-100 mt-1">Transaction Completed</p>
+           </div>
+        </div>
 
-          {/* Success Message */}
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Payment Successful!
-          </h1>
-          <p className="text-gray-600 mb-6">
-            Thank you for your payment. Your transaction has been completed successfully.
-          </p>
+        {/* Receipt Body */}
+        <div className="p-6 relative">
+           {/* Perforated Edge Effect (CSS Visual Trick) */}
+           <div className="absolute top-0 left-0 w-full h-4 -mt-2 bg-white skew-y-1"></div>
 
-          {/* Payment Details */}
-          <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Amount Paid:</span>
-                <span className="font-semibold text-green-600">
-                  ₹{paymentDetails.amount}
-                </span>
-              </div>
-              
-              {paymentDetails.paymentId && (
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Payment ID:</span>
-                  <span className="font-mono text-sm text-gray-900">
-                    {paymentDetails.paymentId.slice(0, 8)}...
-                  </span>
-                </div>
-              )}
-              
-              {paymentDetails.bookingId && (
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Booking ID:</span>
-                  <span className="font-mono text-sm text-gray-900">
-                    {paymentDetails.bookingId.slice(0, 8)}...
-                  </span>
-                </div>
-              )}
-              
-              <div className="flex justify-between">
-                <span className="text-gray-600">Date:</span>
-                <span className="text-gray-900">{new Date().toLocaleDateString()}</span>
-              </div>
-              
-              <div className="flex justify-between">
-                <span className="text-gray-600">Time:</span>
-                <span className="text-gray-900">{new Date().toLocaleTimeString()}</span>
-              </div>
-            </div>
-          </div>
+           <div className="text-center mb-6">
+               <p className="text-xs text-gray-500 uppercase tracking-widest font-bold">Amount Paid</p>
+               <p className="text-4xl font-extrabold text-gray-900 mt-1">₹{paymentDetails.amount}</p>
+           </div>
 
-          {/* Action Buttons */}
-          <div className="space-y-3">
-            <button
-              onClick={handleReview}
-              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 font-medium"
-            >
-              ✨ Leave a Review
-            </button>
-            
-            <Link
-              to={`/farmer/bookings/${paymentDetails.bookingId}`}
-              className="block w-full border border-gray-300 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-50 font-medium text-center"
-            >
-              View Booking Details
-            </Link>
-            
-            <Link
-              to="/farmer/bookings"
-              className="inline-flex items-center justify-center w-full text-blue-600 hover:text-blue-500 font-medium py-2"
-            >
-              <ArrowLeftIcon className="w-4 h-4 mr-1" />
-              Back to My Bookings
-            </Link>
-          </div>
+           <div className="bg-gray-50 p-4 rounded-xl space-y-3 text-sm mb-6 border border-gray-100">
+               <div className="flex justify-between">
+                   <span className="text-gray-500">Payment ID</span>
+                   <span className="font-mono font-medium text-gray-800">#{paymentDetails.paymentId?.slice(-8).toUpperCase()}</span>
+               </div>
+               <div className="flex justify-between">
+                   <span className="text-gray-500">Booking ID</span>
+                   <span className="font-mono font-medium text-gray-800">#{paymentDetails.bookingId?.slice(-8).toUpperCase()}</span>
+               </div>
+               <div className="flex justify-between">
+                   <span className="text-gray-500">Date</span>
+                   <span className="font-medium text-gray-800">{new Date().toLocaleString()}</span>
+               </div>
+               <div className="flex justify-between pt-3 border-t border-gray-200">
+                   <span className="text-gray-500">Method</span>
+                   <span className="font-medium text-gray-800">Online Wallet</span>
+               </div>
+           </div>
 
-          {/* Additional Info */}
-          <div className="mt-8 p-4 bg-blue-50 rounded-lg">
-            <h3 className="text-sm font-medium text-blue-800 mb-2">
-              What happens next?
-            </h3>
-            <ul className="text-sm text-blue-700 space-y-1 text-left">
-              <li>✅ Owner has been notified of your payment</li>
-              <li>✅ Payment receipt has been generated</li>
-              <li>✅ You can now leave a review for the service</li>
-              <li>✅ Owner will receive payout within 24 hours</li>
-            </ul>
-          </div>
+           {/* Actions */}
+           <div className="space-y-3">
+               <button 
+                 onClick={() => navigate(`/farmer/review/${paymentDetails.bookingId}`)}
+                 className="w-full bg-green-600 text-white py-3.5 px-4 rounded-xl font-bold shadow-lg shadow-green-200 hover:bg-green-700 transition-all flex items-center justify-center gap-2"
+               >
+                   <StarIcon className="w-5 h-5" /> Rate Service
+               </button>
+
+               <div className="grid grid-cols-2 gap-3">
+                   <button 
+                     onClick={handlePrint}
+                     className="flex items-center justify-center gap-2 bg-gray-100 text-gray-700 py-3 rounded-xl font-medium hover:bg-gray-200"
+                   >
+                       <ArrowDownTrayIcon className="w-4 h-4" /> Receipt
+                   </button>
+                   <button 
+                     onClick={() => navigate('/farmer/bookings')}
+                     className="flex items-center justify-center gap-2 bg-gray-100 text-gray-700 py-3 rounded-xl font-medium hover:bg-gray-200"
+                   >
+                       Home
+                   </button>
+               </div>
+           </div>
+
         </div>
       </div>
     </div>

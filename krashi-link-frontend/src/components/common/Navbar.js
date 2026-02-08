@@ -1,14 +1,42 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useLocale } from '../../context/LocaleContext';
 import { useSocket } from '../../context/SocketContext';
 import { useTranslation } from 'react-i18next';
 import NotificationBell from './NotificationBell';
 import Toast from './Toast';
-import { HomeIcon, UserIcon, LanguageIcon, ChevronDownIcon, Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
+import { 
+  HomeIcon, 
+  UserIcon, 
+  LanguageIcon, 
+  ChevronDownIcon, 
+  Bars3Icon, 
+  XMarkIcon,
+  ArrowRightOnRectangleIcon
+} from '@heroicons/react/24/outline';
 
 const NOTIFICATION_SOUND = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
+
+// 🎨 HELPER: Smart Link Component (Handles Active State)
+const NavLink = ({ to, children, mobile = false, onClick }) => {
+  const location = useLocation();
+  const isActive = location.pathname === to;
+
+  const baseClasses = mobile
+    ? "block px-4 py-3 rounded-lg text-base font-medium transition-colors"
+    : "px-3 py-2 rounded-lg text-sm font-medium transition-all";
+
+  const activeClasses = isActive
+    ? "bg-green-50 text-green-700 font-bold"
+    : "text-gray-600 hover:bg-gray-50 hover:text-green-600";
+
+  return (
+    <Link to={to} className={`${baseClasses} ${activeClasses}`} onClick={onClick}>
+      {children}
+    </Link>
+  );
+};
 
 const Navbar = () => {
   const { user, logout } = useAuth();
@@ -20,101 +48,199 @@ const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [toast, setToast] = useState(null);
+  const profileRef = useRef(null); // To detect outside clicks
 
-  // --- 🔊 FIX: LISTEN ONLY TO PERSONAL NOTIFICATIONS ---
+  // --- 🔔 NOTIFICATION LOGIC (UNCHANGED) ---
   useEffect(() => {
     if (socket && user) {
-      // Sirf 'notification' event suno jo Backend Controller bhejta hai
       const handleNotification = (data) => {
         console.log("🔔 Personal Notification:", data);
-        
-        // Sound
         try { const audio = new Audio(NOTIFICATION_SOUND); audio.play().catch(e => {}); } catch(e) {}
-
-        // Toast
         setToast({ message: data.message, type: data.type || 'info' });
       };
-
       socket.on('notification', handleNotification);
       return () => socket.off('notification', handleNotification);
     }
   }, [socket, user]);
-  // ----------------------------------------------------
+
+  // --- 🖱️ CLOSE DROPDOWNS ON OUTSIDE CLICK ---
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (profileRef.current && !profileRef.current.contains(event.target)) {
+        setIsProfileOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleLogout = () => { logout(); navigate('/login'); setIsProfileOpen(false); };
-  const getDashboardPath = () => { /* Same logic */ if(!user) return '/login'; return user.role === 'admin' ? '/admin/dashboard' : user.role === 'owner' ? '/owner/dashboard' : '/farmer/dashboard'; };
-  const getRoleDisplayName = (role) => role;
+  
+  const getDashboardPath = () => {
+    if(!user) return '/login'; 
+    return user.role === 'admin' ? '/admin/dashboard' : user.role === 'owner' ? '/owner/dashboard' : '/farmer/dashboard'; 
+  };
 
   return (
     <>
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       
-      <nav className="bg-white shadow-lg border-b border-gray-200 sticky top-0 z-40">
+      {/* CHANGE 1: Glassmorphism Effect (backdrop-blur) */}
+      <nav className="sticky top-0 z-40 w-full bg-white/80 backdrop-blur-md border-b border-gray-200 shadow-sm transition-all">
         <div className="container mx-auto px-4">
           <div className="flex justify-between items-center h-16">
-            {/* Logo */}
-            <Link to={getDashboardPath()} className="flex items-center space-x-2 text-primary-600 hover:text-primary-700">
-              <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center"><HomeIcon className="w-5 h-5 text-white" /></div>
-              <span className="text-xl font-bold">{t('app.name')}</span>
+            
+            {/* Logo Area */}
+            <Link to={getDashboardPath()} className="flex items-center space-x-2 group">
+              <div className="w-9 h-9 bg-gradient-to-br from-green-500 to-green-700 rounded-xl flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
+                <HomeIcon className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-800 to-gray-600">
+                {t('app.name')}
+              </span>
             </Link>
 
             {/* Desktop Menu */}
-            <div className="hidden md:flex items-center space-x-6">
-              <button onClick={toggleLanguage} className="flex items-center space-x-1 text-gray-600 hover:text-primary-600">
-                <LanguageIcon className="w-5 h-5" /><span>{isHindi ? 'English' : 'हिंदी'}</span>
+            <div className="hidden md:flex items-center space-x-2">
+              <button 
+                onClick={toggleLanguage} 
+                className="flex items-center space-x-1 px-3 py-2 rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-100 transition-colors"
+              >
+                <LanguageIcon className="w-4 h-4" />
+                <span>{isHindi ? 'English' : 'हिंदी'}</span>
               </button>
-              {user?.role === 'farmer' && (<><Link to="/farmer/machines" className="text-gray-700 hover:text-primary-600">Machines</Link><Link to="/farmer/bookings" className="text-gray-700 hover:text-primary-600">My Bookings</Link></>)}
-              {user?.role === 'owner' && (<><Link to="/owner/my-machines" className="text-gray-700 hover:text-primary-600">My Machines</Link><Link to="/owner/requests" className="text-gray-700 hover:text-primary-600">Requests</Link></>)}
 
+              {/* Dynamic Links Based on Role */}
+              {user?.role === 'farmer' && (
+                <>
+                  <NavLink to="/farmer/machines">Machines</NavLink>
+                  <NavLink to="/farmer/bookings">My Bookings</NavLink>
+                </>
+              )}
+              {user?.role === 'owner' && (
+                <>
+                  <NavLink to="/owner/my-machines">My Machines</NavLink>
+                  <NavLink to="/owner/requests">Requests</NavLink>
+                </>
+              )}
+
+              {/* Auth Buttons / Profile */}
               {user ? (
-                <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-3 ml-4 pl-4 border-l border-gray-200">
                   <NotificationBell />
-                  <div className="relative">
-                    <button onClick={() => setIsProfileOpen(!isProfileOpen)} className="flex items-center space-x-2 text-gray-700 hover:text-primary-600">
-                      <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center"><UserIcon className="w-5 h-5 text-primary-600" /></div>
-                      <span className="font-medium">{user.name}</span><ChevronDownIcon className="w-4 h-4" />
+                  
+                  {/* Profile Dropdown */}
+                  <div className="relative" ref={profileRef}>
+                    <button 
+                      onClick={() => setIsProfileOpen(!isProfileOpen)} 
+                      className="flex items-center space-x-2 p-1 pr-3 rounded-full border border-gray-200 hover:shadow-md hover:border-green-200 transition-all bg-white"
+                    >
+                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center text-green-700 font-bold text-sm">
+                        {user.name.charAt(0).toUpperCase()}
+                      </div>
+                      <span className="text-sm font-medium text-gray-700 max-w-[100px] truncate">{user.name}</span>
+                      <ChevronDownIcon className={`w-4 h-4 text-gray-400 transition-transform ${isProfileOpen ? 'rotate-180' : ''}`} />
                     </button>
+
+                    {/* Dropdown Menu with Animation */}
                     {isProfileOpen && (
-                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-                        <div className="px-4 py-2 border-b border-gray-100"><p className="text-sm font-medium text-gray-900">{user.name}</p><p className="text-xs text-gray-500 capitalize">{getRoleDisplayName(user.role)}</p></div>
-                        <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">{t('auth.logout')}</button>
+                      <div className="absolute right-0 mt-2 w-56 origin-top-right bg-white rounded-xl shadow-xl border border-gray-100 py-2 animate-[fadeIn_0.2s_ease-out] ring-1 ring-black ring-opacity-5 focus:outline-none">
+                        <div className="px-4 py-3 border-b border-gray-50">
+                          <p className="text-sm font-semibold text-gray-900">{user.name}</p>
+                          <p className="text-xs text-gray-500 capitalize">{user.role}</p>
+                        </div>
+                        <div className="py-1">
+                          <Link to="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700" onClick={() => setIsProfileOpen(false)}>
+                            Your Profile
+                          </Link>
+                          {/* Add other profile links here */}
+                        </div>
+                        <div className="py-1 border-t border-gray-50">
+                          <button onClick={handleLogout} className="flex w-full items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50">
+                            <ArrowRightOnRectangleIcon className="w-4 h-4 mr-2" />
+                            {t('auth.logout')}
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center space-x-4"><Link to="/login" className="text-gray-600">{t('auth.login')}</Link><Link to="/register" className="btn-primary text-sm">{t('auth.register')}</Link></div>
+                <div className="flex items-center space-x-3 ml-4">
+                  <Link to="/login" className="text-sm font-medium text-gray-600 hover:text-green-600 px-3 py-2">
+                    {t('Login')}
+                  </Link>
+                  <Link to="/register" className="text-sm font-medium bg-green-600 text-white px-5 py-2.5 rounded-lg hover:bg-green-700 shadow-lg shadow-green-600/20 transition-all active:scale-95">
+                    {t('Register')}
+                  </Link>
+                </div>
               )}
             </div>
+
             {/* Mobile Menu Button */}
-            <div className="md:hidden flex items-center space-x-4">
+            <div className="md:hidden flex items-center space-x-3">
               {user && <NotificationBell />}
-              <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-gray-600 hover:text-primary-600">
+              <button 
+                onClick={() => setIsMenuOpen(!isMenuOpen)} 
+                className="p-2 rounded-lg text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
                 {isMenuOpen ? <XMarkIcon className="w-6 h-6" /> : <Bars3Icon className="w-6 h-6" />}
               </button>
             </div>
           </div>
-          {/* Mobile Dropdown (Copy existing mobile menu JSX here) */}
-           {isMenuOpen && (
-            <div className="md:hidden py-4 border-t border-gray-200">
-               <div className="flex flex-col space-y-4">
-                  <button onClick={toggleLanguage} className="flex items-center space-x-2 text-gray-600"><LanguageIcon className="w-5 h-5" /><span>{isHindi ? 'Switch to English' : 'हिंदी'}</span></button>
-                  {user ? (
-                     <>
-                        <div className="flex items-center space-x-2 py-2">
-                           <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center"><UserIcon className="w-5 h-5 text-primary-600" /></div>
-                           <div><p className="font-medium text-gray-900">{user.name}</p><p className="text-sm text-gray-500 capitalize">{user.role}</p></div>
-                        </div>
-                        {user.role === 'farmer' && (<><Link to="/farmer/machines" className="block py-2 text-gray-600" onClick={()=>setIsMenuOpen(false)}>Machines</Link><Link to="/farmer/bookings" className="block py-2 text-gray-600" onClick={()=>setIsMenuOpen(false)}>Bookings</Link></>)}
-                        {user.role === 'owner' && (<><Link to="/owner/my-machines" className="block py-2 text-gray-600" onClick={()=>setIsMenuOpen(false)}>My Machines</Link><Link to="/owner/requests" className="block py-2 text-gray-600" onClick={()=>setIsMenuOpen(false)}>Requests</Link></>)}
-                        <button onClick={handleLogout} className="text-left text-gray-600 py-2">Logout</button>
-                     </>
-                  ) : (
-                     <div className="flex flex-col space-y-2"><Link to="/login" className="text-gray-600 py-2" onClick={()=>setIsMenuOpen(false)}>Login</Link><Link to="/register" className="btn-primary text-center py-2" onClick={()=>setIsMenuOpen(false)}>Register</Link></div>
-                  )}
-               </div>
-            </div>
-          )}
+        </div>
+
+        {/* CHANGE 3: Mobile Menu with Smooth Transition */}
+        <div className={`md:hidden overflow-hidden transition-all duration-300 ease-in-out ${isMenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
+          <div className="px-4 pt-2 pb-6 space-y-2 bg-white border-t border-gray-100 shadow-inner">
+            <button onClick={toggleLanguage} className="flex w-full items-center space-x-2 px-4 py-3 text-gray-600 hover:bg-gray-50 rounded-lg">
+              <LanguageIcon className="w-5 h-5" />
+              <span>{isHindi ? 'Switch to English' : 'हिंदी'}</span>
+            </button>
+            
+            {user ? (
+              <>
+                <div className="px-4 py-3 bg-gray-50 rounded-lg flex items-center space-x-3 mb-2">
+                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-700 font-bold">
+                     {user.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-900">{user.name}</p>
+                    <p className="text-xs text-gray-500 capitalize">{user.role}</p>
+                  </div>
+                </div>
+
+                {user.role === 'farmer' && (
+                  <>
+                    <NavLink to="/farmer/machines" mobile onClick={()=>setIsMenuOpen(false)}>Machines</NavLink>
+                    <NavLink to="/farmer/bookings" mobile onClick={()=>setIsMenuOpen(false)}>Bookings</NavLink>
+                  </>
+                )}
+                {user.role === 'owner' && (
+                  <>
+                    <NavLink to="/owner/my-machines" mobile onClick={()=>setIsMenuOpen(false)}>My Machines</NavLink>
+                    <NavLink to="/owner/requests" mobile onClick={()=>setIsMenuOpen(false)}>Requests</NavLink>
+                  </>
+                )}
+                
+                <div className="border-t border-gray-100 my-2 pt-2">
+                    <button onClick={handleLogout} className="flex w-full items-center px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg font-medium">
+                        <ArrowRightOnRectangleIcon className="w-5 h-5 mr-2" />
+                        Logout
+                    </button>
+                </div>
+              </>
+            ) : (
+              <div className="grid grid-cols-2 gap-4 pt-2">
+                <Link to="/login" className="flex items-center justify-center px-4 py-3 border border-gray-200 rounded-lg text-gray-700 font-medium" onClick={()=>setIsMenuOpen(false)}>
+                    Login
+                </Link>
+                <Link to="/register" className="flex items-center justify-center px-4 py-3 bg-green-600 text-white rounded-lg font-medium shadow-lg shadow-green-600/20" onClick={()=>setIsMenuOpen(false)}>
+                    Register
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
       </nav>
     </>

@@ -11,7 +11,8 @@ const Button = ({
   type = 'button',
   ...props
 }) => {
-  const baseClasses = 'font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
+  // CHANGE 1: Added 'active:scale-95' (press effect) & 'whitespace-nowrap' (text in one line)
+  const baseClasses = 'font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 whitespace-nowrap flex items-center justify-center';
   
   const variants = {
     primary: 'bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500',
@@ -38,10 +39,11 @@ const Button = ({
       {...props}
     >
       {loading ? (
-        <div className="flex items-center justify-center">
-          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+        // CHANGE 2: Removed wrapper div (button is flex now) & changed 'border-white' to 'border-current'
+        <>
+          <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></div>
           Loading...
-        </div>
+        </>
       ) : (
         children
       )}

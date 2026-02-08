@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext'; // ✅ CHANGED: Added useAuth
 import { SocketProvider } from './context/SocketContext';
 import { LocaleProvider } from './context/LocaleContext';
 import Navbar from './components/common/Navbar';
 import LoadingSpinner from './components/common/Loader';
-import InstallPWA from './components/common/InstallPWA'; // IMPORT ADDED
-import UpdateToast from './components/common/UpdateToast'; // IMPORT ADDED
+import BottomNav from './components/common/BottomNav'; // ✅ NEW: Bottom Navigation
+import InstallPWA from './components/common/InstallPWA';
+import UpdateToast from './components/common/UpdateToast';
 import * as serviceWorkerRegistration from './serviceWorkerRegistration';
 
-
-// ... (Baki saare Lazy Imports same rahenge - Login, Dashboard etc.) ...
+// --- Lazy Load Pages ---
 const AdminBroadcast = React.lazy(() => import('./pages/Admin/Broadcast'));
 const AdminActivityLogs = React.lazy(() => import('./pages/Admin/ActivityLogs'));
 const Login = React.lazy(() => import('./pages/Auth/Login'));
@@ -35,8 +35,9 @@ const PaymentHistory = React.lazy(() => import('./pages/Payment/PaymentHistory')
 const ReviewForm = React.lazy(() => import('./pages/Review/ReviewForm'));
 const MyReviews = React.lazy(() => import('./pages/Review/MyReviews'));
 const MachineReviews = React.lazy(() => import('./pages/Review/MachineReviews'));
+const OwnerEarnings = React.lazy(() => import('./pages/Owner/Earnings')); // ✅ Ensure this exists
 
-// ... (ErrorBoundary, ProtectedRoute, RoleRedirect components same rahenge) ...
+// --- Helpers ---
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -47,25 +48,45 @@ class ErrorBoundary extends React.Component {
   }
   render() {
     if (this.state.hasError) {
-      return <div className="p-10 text-center"><h1>Something went wrong.</h1><button onClick={() => window.location.reload()} className="btn-primary mt-4">Reload</button></div>;
+      return (
+        <div className="flex flex-col items-center justify-center min-h-screen text-center p-6">
+          <h1 className="text-xl font-bold text-gray-800">Something went wrong.</h1>
+          <p className="text-gray-500 mt-2">Please refresh the page.</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="mt-4 bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
+          >
+            Reload App
+          </button>
+        </div>
+      );
     }
     return this.props.children;
   }
 }
 
+// --- ✅ FIX: Updated ProtectedRoute to use Context ---
 const ProtectedRoute = ({ children, allowedRoles }) => {
-  const user = JSON.parse(localStorage.getItem('user'));
+  const { user, loading } = useAuth(); // Now using hook instead of direct localStorage
+
+  if (loading) return <LoadingSpinner />;
   if (!user) return <Navigate to="/login" replace />;
   if (allowedRoles && !allowedRoles.includes(user.role)) return <Navigate to="/" replace />;
+  
   return children;
 };
 
+// --- ✅ FIX: Updated RoleRedirect to use Context ---
 const RoleRedirect = () => {
-  const user = JSON.parse(localStorage.getItem('user'));
+  const { user, loading } = useAuth(); // Now using hook
+
+  if (loading) return <LoadingSpinner />;
   if (!user) return <Navigate to="/login" replace />;
+  
   if (user.role === 'farmer') return <Navigate to="/farmer/dashboard" replace />;
   if (user.role === 'owner') return <Navigate to="/owner/dashboard" replace />;
   if (user.role === 'admin') return <Navigate to="/admin/dashboard" replace />;
+  
   return <Navigate to="/login" replace />;
 };
 
@@ -73,23 +94,18 @@ function App() {
   const [waitingWorker, setWaitingWorker] = useState(null);
   const [showUpdate, setShowUpdate] = useState(false);
 
-  // Setup Service Worker Updates
   useEffect(() => {
     serviceWorkerRegistration.register({
       onUpdate: (registration) => {
         setWaitingWorker(registration.waiting);
         setShowUpdate(true);
       },
-      onSuccess: () => {
-        console.log('PWA: Content is cached for offline use.');
-      }
+      onSuccess: () => console.log('PWA: Content is cached for offline use.')
     });
   }, []);
 
   const updateServiceWorker = () => {
-    if (waitingWorker) {
-      waitingWorker.postMessage({ type: 'SKIP_WAITING' });
-    }
+    if (waitingWorker) waitingWorker.postMessage({ type: 'SKIP_WAITING' });
     setShowUpdate(false);
     window.location.reload();
   };
@@ -100,11 +116,12 @@ function App() {
         <AuthProvider>
           <SocketProvider>
             <Router>
-              <div className="min-h-screen bg-gray-50 flex flex-col">
+              <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
+                
+                {/* 1. Top Navbar (Logo & Desktop Menu) */}
                 <Navbar />
                 
-                {/* PWA Components Added Here */}
-                <InstallPWA />
+                {/* 2. PWA Update Notification */}
                 {showUpdate && (
                   <UpdateToast 
                     onRefresh={updateServiceWorker} 
@@ -112,13 +129,16 @@ function App() {
                   />
                 )}
 
-                <main className="container mx-auto px-4 py-6 flex-grow">
+                {/* 3. Main Content Area */}
+                {/* pb-20 adds padding at bottom so content isn't hidden behind BottomNav on mobile */}
+                <main className="container mx-auto px-4 py-6 flex-grow pb-24 md:pb-8">
                   <React.Suspense fallback={<LoadingSpinner />}>
                     <Routes>
-                      {/* ... All your existing routes ... */}
+                      {/* Public Routes */}
                       <Route path="/login" element={<Login />} />
                       <Route path="/register" element={<Register />} />
 
+                      {/* 🚜 FARMER ROUTES */}
                       <Route path="/farmer/*" element={
                         <ProtectedRoute allowedRoles={['farmer']}>
                           <Routes>
@@ -136,6 +156,7 @@ function App() {
                         </ProtectedRoute>
                       } />
 
+                      {/* 🛠️ OWNER ROUTES */}
                       <Route path="/owner/*" element={
                         <ProtectedRoute allowedRoles={['owner']}>
                           <Routes>
@@ -143,12 +164,14 @@ function App() {
                             <Route path="my-machines" element={<OwnerMyMachines />} />
                             <Route path="requests" element={<OwnerRequests />} />
                             <Route path="booking/:id" element={<FarmerBookingDetails />} />
+                            <Route path="earnings" element={<OwnerEarnings />} />
                             <Route path="reviews" element={<MyReviews />} />
                             <Route path="machine/:machineId/reviews" element={<MachineReviews />} />
                           </Routes>
                         </ProtectedRoute>
                       } />
 
+                      {/* 🛡️ ADMIN ROUTES */}
                       <Route path="/admin/*" element={
                         <ProtectedRoute allowedRoles={['admin']}>
                           <Routes>
@@ -163,6 +186,7 @@ function App() {
                         </ProtectedRoute>
                       } />
 
+                      {/* Common & Redirects */}
                       <Route path="/payment-success" element={<PaymentSuccess />} />
                       <Route path="/payment-failed" element={<PaymentFailed />} />
                       <Route path="/" element={<RoleRedirect />} />
@@ -170,6 +194,13 @@ function App() {
                     </Routes>
                   </React.Suspense>
                 </main>
+
+                {/* 4. Bottom Navigation (Visible only on Mobile) */}
+                <BottomNav />
+
+                {/* 5. Install PWA Button (Positioned above BottomNav) */}
+                <InstallPWA />
+
               </div>
             </Router>
           </SocketProvider>

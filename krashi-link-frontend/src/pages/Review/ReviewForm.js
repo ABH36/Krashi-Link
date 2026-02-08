@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import reviewService from '../../services/reviewService';
 import bookingService from '../../services/bookingService';
 import Loader from '../../components/common/Loader';
-import { StarIcon, XMarkIcon, CheckBadgeIcon } from '@heroicons/react/24/outline';
+import { StarIcon, CheckCircleIcon, HandThumbUpIcon, ArrowLeftIcon } from '@heroicons/react/24/solid';
+import { StarIcon as StarOutline } from '@heroicons/react/24/outline';
 
 const ReviewForm = () => {
   const { bookingId } = useParams();
@@ -12,9 +13,10 @@ const ReviewForm = () => {
   const [submitting, setSubmitting] = useState(false);
   const [booking, setBooking] = useState(null);
   const [error, setError] = useState(null);
+  const [isSubmitted, setIsSubmitted] = useState(false);
   
   const [formData, setFormData] = useState({
-    rating: 5,
+    rating: 0,
     comment: '',
     wouldRecommend: true
   });
@@ -23,77 +25,60 @@ const ReviewForm = () => {
     const init = async () => {
       try {
         setLoading(true);
-        
-        // 1. Get Booking
         const bookingRes = await bookingService.getBookingById(bookingId);
         if (!bookingRes.success) throw new Error('Failed to load booking');
         
         const bookingData = bookingRes.data.booking;
         
-        if (bookingData.status !== 'paid') {
-             // Allow review if it's paid (status 'paid' is what we expect)
-             // If status is not 'paid', check if it is completed at least
-             if (bookingData.status !== 'completed_pending_payment') {
-                 // Strict check: Usually we only allow review after payment
-                 // But for now, let's ensure it is at least paid
-             }
+        // Strict check: Only paid/completed bookings can be reviewed
+        if (!['paid', 'completed_pending_payment'].includes(bookingData.status)) {
+             setError('Booking is not completed yet.');
+             setLoading(false);
+             return;
         }
         setBooking(bookingData);
 
-        // 2. Check Existing Review (Graceful)
+        // Check if already reviewed
         try {
             const reviewRes = await reviewService.getBookingReview(bookingId);
             if (reviewRes.success && reviewRes.data.review) {
-                setError('You have already reviewed this booking.');
-                return; // Stop here
+                setIsSubmitted(true); // Already done
             }
-        } catch (e) {
-            console.warn("Review check failed, assuming no review exists", e);
-        }
+        } catch (e) {}
 
       } catch (err) {
-        console.error(err);
-        setError('Failed to load details. Please try again.');
+        setError('Failed to load details.');
       } finally {
         setLoading(false);
       }
     };
-
     init();
   }, [bookingId]);
 
-  const handleRatingChange = (rating) => {
-    setFormData(prev => ({ ...prev, rating }));
-  };
-
-  const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
+  const getRatingLabel = (r) => {
+      switch(r) {
+          case 1: return "Terrible 😞";
+          case 2: return "Bad 🙁";
+          case 3: return "Okay 😐";
+          case 4: return "Good 🙂";
+          case 5: return "Excellent! 🤩";
+          default: return "Select Rating";
+      }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.comment.trim()) {
-      alert('Please write a short comment.');
-      return;
+    if (formData.rating === 0) {
+        alert("Please select a star rating");
+        return;
     }
-
+    
     try {
       setSubmitting(true);
-      const res = await reviewService.createReview({
-        bookingId,
-        ...formData
-      });
-
-      if (res.success) {
-        alert("Review Submitted! Thank you.");
-        navigate('/farmer/bookings');
-      }
+      const res = await reviewService.createReview({ bookingId, ...formData });
+      if (res.success) setIsSubmitted(true);
     } catch (err) {
-      alert(err.response?.data?.message || 'Submission failed');
+      alert('Submission failed. Try again.');
     } finally {
       setSubmitting(false);
     }
@@ -101,100 +86,107 @@ const ReviewForm = () => {
 
   if (loading) return <Loader text="Loading..." />;
 
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="text-center bg-white p-6 rounded-lg shadow-lg max-w-sm w-full">
-          <div className="text-green-600 mb-3 flex justify-center">
-             <CheckBadgeIcon className="w-12 h-12" />
-          </div>
-          <h2 className="text-lg font-bold text-gray-900 mb-2">Review Status</h2>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <button 
-            onClick={() => navigate('/farmer/bookings')}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 w-full"
-          >
-            Back to Bookings
-          </button>
+  if (isSubmitted) {
+      return (
+        <div className="min-h-screen bg-green-50 flex items-center justify-center p-4">
+            <div className="bg-white p-8 rounded-2xl shadow-xl text-center max-w-sm w-full animate-[scaleIn_0.3s_ease-out]">
+                <div className="bg-green-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <CheckCircleIcon className="w-12 h-12 text-green-600" />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">Thank You!</h2>
+                <p className="text-gray-600 mb-6">Your feedback helps us improve the KrishiLink community.</p>
+                <button onClick={() => navigate('/farmer/bookings')} className="w-full bg-green-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-green-700 transition-all">
+                    Back to Bookings
+                </button>
+            </div>
         </div>
-      </div>
-    );
+      );
   }
 
+  if (error) return (
+      <div className="min-h-screen flex items-center justify-center p-4 text-center">
+          <div className="bg-red-50 p-6 rounded-xl text-red-600 border border-red-200">
+              <p className="font-bold">{error}</p>
+              <button onClick={() => navigate(-1)} className="mt-4 text-sm underline">Go Back</button>
+          </div>
+      </div>
+  );
+
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4 flex justify-center">
-      <div className="max-w-lg w-full bg-white rounded-xl shadow-lg overflow-hidden">
-        <div className="bg-blue-600 p-6 text-white text-center">
-          <h1 className="text-2xl font-bold">Rate Your Experience</h1>
-          <p className="opacity-90 mt-1">
-            with {booking?.ownerId?.name} ({booking?.machineId?.name})
-          </p>
+    <div className="min-h-screen bg-gray-50 py-10 px-4 flex justify-center items-center">
+      <div className="max-w-md w-full bg-white rounded-3xl shadow-xl overflow-hidden relative">
+        
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-8 text-center text-white relative">
+            <h1 className="text-2xl font-bold">Rate Experience</h1>
+            <p className="opacity-90 text-sm mt-1">
+                How was your rental with <strong>{booking?.ownerId?.name}</strong>?
+            </p>
+            <div className="absolute top-4 left-4">
+                <button onClick={() => navigate(-1)} className="text-white/80 hover:text-white"><ArrowLeftIcon className="w-6 h-6"/></button>
+            </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="p-8 space-y-8">
           
-          {/* Star Rating */}
+          {/* Star Rating Interaction */}
           <div className="text-center">
-            <label className="block text-sm font-medium text-gray-700 mb-2">How was the service?</label>
-            <div className="flex justify-center space-x-2">
+            <p className="text-lg font-bold text-gray-700 mb-4">{getRatingLabel(formData.rating)}</p>
+            <div className="flex justify-center gap-2">
               {[1, 2, 3, 4, 5].map((star) => (
                 <button
                   key={star}
                   type="button"
-                  onClick={() => handleRatingChange(star)}
-                  className="focus:outline-none transform hover:scale-110 transition-transform"
+                  onClick={() => setFormData(prev => ({...prev, rating: star}))}
+                  className="focus:outline-none transition-transform active:scale-90 hover:scale-110"
                 >
-                  <StarIcon className={`w-10 h-10 ${star <= formData.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} />
+                  {star <= formData.rating ? (
+                      <StarIcon className="w-10 h-10 text-yellow-400 drop-shadow-sm" />
+                  ) : (
+                      <StarOutline className="w-10 h-10 text-gray-300" />
+                  )}
                 </button>
               ))}
             </div>
-            <p className="text-sm text-gray-500 mt-2">
-                {formData.rating === 5 ? "Excellent!" : formData.rating === 1 ? "Poor" : "Good"}
-            </p>
           </div>
 
-          {/* Comment */}
+          {/* Comment Area */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Your Feedback</label>
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Detailed Feedback</label>
             <textarea
-              name="comment"
               value={formData.comment}
-              onChange={handleInputChange}
+              onChange={(e) => setFormData(prev => ({...prev, comment: e.target.value}))}
               rows="4"
-              className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none resize-none"
-              placeholder="Machine condition, Owner behavior, etc..."
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all resize-none text-sm"
+              placeholder="Tell us about the machine quality, owner behavior..."
             ></textarea>
           </div>
 
-          {/* Recommend Checkbox */}
-          <div className="flex items-center bg-blue-50 p-3 rounded-lg">
+          {/* Recommendation Toggle */}
+          <label className={`flex items-center p-4 rounded-xl border-2 cursor-pointer transition-all ${formData.wouldRecommend ? 'border-green-500 bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}>
             <input
-              type="checkbox"
-              name="wouldRecommend"
-              checked={formData.wouldRecommend}
-              onChange={handleInputChange}
-              className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                type="checkbox"
+                className="hidden"
+                checked={formData.wouldRecommend}
+                onChange={(e) => setFormData(prev => ({...prev, wouldRecommend: e.target.checked}))}
             />
-            <span className="ml-3 text-sm font-medium text-gray-700">I would recommend this owner</span>
-          </div>
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center mr-3 ${formData.wouldRecommend ? 'bg-green-100 text-green-600' : 'bg-gray-200 text-gray-400'}`}>
+                <HandThumbUpIcon className="w-6 h-6" />
+            </div>
+            <span className={`font-bold text-sm ${formData.wouldRecommend ? 'text-green-800' : 'text-gray-500'}`}>
+                I would recommend this provider
+            </span>
+          </label>
 
-          {/* Buttons */}
-          <div className="flex gap-4">
-            <button
-              type="button"
-              onClick={() => navigate('/farmer/bookings')}
-              className="flex-1 py-3 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50"
-            >
-              Skip
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="flex-1 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 shadow-md disabled:opacity-70"
-            >
-              {submitting ? 'Submitting...' : 'Submit Review'}
-            </button>
-          </div>
+          {/* Submit Button */}
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full py-4 bg-gray-900 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-black transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {submitting ? 'Submitting...' : 'Submit Review'}
+          </button>
+
         </form>
       </div>
     </div>

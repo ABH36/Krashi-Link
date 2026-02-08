@@ -7,14 +7,39 @@ const { ERROR_CODES } = require('../config/constants');
 exports.createMachine = async (req, res) => {
   try {
     console.log('📨 CREATE MACHINE REQUEST:', req.body);
+    console.log('📸 FILE:', req.file); // Debug log
     
-    const { type, name, model, pricing, location, images, meta } = req.body;
+    // Parse FormData fields (req.body mein Strings aate hain FormData se)
+    let { type, name, model, pricing, location, meta, description, rate, unit, addressText } = req.body;
 
-    if (!type || !name || !pricing || !location) {
+    // ✅ FIX: Construct Pricing Object manually if coming from FormData
+    if (!pricing && rate && unit) {
+        pricing = { rate: Number(rate), unit: unit };
+    }
+
+    // ✅ FIX: Construct Location Object manually if coming from FormData
+    if (!location && addressText) {
+        location = { addressText: addressText, coordinates: [] }; // Coordinates baad mein add kar sakte hain
+    }
+
+    // Handle JSON parsing if they came as strings (FormData limitations)
+    if (typeof pricing === 'string') pricing = JSON.parse(pricing);
+    if (typeof location === 'string') location = JSON.parse(location);
+
+    if (!type || !name || !pricing) {
       return res.status(400).json({
         success: false,
-        error: { code: 'VAL_400', message: 'Missing required fields' }
+        error: { code: 'VAL_400', message: 'Missing required fields (Name, Type, Pricing)' }
       });
+    }
+
+    // ✅ IMAGE HANDLING
+    let imageUrl = '';
+    if (req.file) {
+        // Create full URL for the uploaded image
+        const protocol = req.protocol;
+        const host = req.get('host');
+        imageUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
     }
 
     const machine = await Machine.create({
@@ -24,7 +49,10 @@ exports.createMachine = async (req, res) => {
       model,
       pricing,
       location,
-      images: images || [],
+      description, // Added description support
+      // Store single image in 'image' field (string) or array if your model supports it
+      image: imageUrl, 
+      images: imageUrl ? [imageUrl] : [], // Backward compatibility
       meta: meta || {}
     });
 
@@ -33,7 +61,7 @@ exports.createMachine = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      data: { machineId: machine._id },
+      data: { machineId: machine._id, machine },
       message: 'Machine created successfully'
     });
 
@@ -43,7 +71,7 @@ exports.createMachine = async (req, res) => {
   }
 };
 
-// 2. Get all machines (Filters)
+// 2. Get all machines (Filters) -> NO CHANGE
 exports.getMachines = async (req, res) => {
   try {
     const { type, availability, lat, lng, radiusKm, page = 1, limit = 10 } = req.query;
@@ -93,7 +121,7 @@ exports.getMachines = async (req, res) => {
   }
 };
 
-// 3. Get machine by ID
+// 3. Get machine by ID -> NO CHANGE
 exports.getMachineById = async (req, res) => {
   try {
     const machine = await Machine.findById(req.params.id)
@@ -107,19 +135,46 @@ exports.getMachineById = async (req, res) => {
   }
 };
 
-// 4. Update machine (FIXED ID CHECK)
+// 4. Update machine
 exports.updateMachine = async (req, res) => {
   try {
     const machine = await Machine.findById(req.params.id);
     if (!machine) return res.status(404).json({ success: false, message: 'Machine not found' });
 
-    // 👇 FIX: String Comparison
     if (machine.ownerId.toString() !== req.user.id.toString() && req.user.role !== 'admin') {
       return res.status(403).json({ success: false, message: 'Access Denied' });
     }
 
-    const updates = req.body;
-    const allowedUpdates = ['name', 'model', 'pricing', 'location', 'images', 'meta', 'maintenance', 'availability'];
+    // Extract fields including flat fields from FormData
+    const { rate, unit, addressText, ...otherUpdates } = req.body;
+    let updates = { ...otherUpdates };
+
+    // Handle Pricing update
+    if (rate || unit) {
+        updates.pricing = {
+            rate: rate ? Number(rate) : machine.pricing.rate,
+            unit: unit || machine.pricing.unit
+        };
+    }
+
+    // Handle Location update
+    if (addressText) {
+        updates.location = {
+            ...machine.location,
+            addressText: addressText
+        };
+    }
+
+    // ✅ HANDLE IMAGE UPDATE
+    if (req.file) {
+        const protocol = req.protocol;
+        const host = req.get('host');
+        const imageUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
+        updates.image = imageUrl;
+        updates.images = [imageUrl]; // Keep legacy support
+    }
+
+    const allowedUpdates = ['name', 'model', 'pricing', 'location', 'image', 'images', 'meta', 'maintenance', 'availability', 'description', 'type'];
 
     Object.keys(updates).forEach(key => {
       if (allowedUpdates.includes(key)) {
@@ -131,17 +186,17 @@ exports.updateMachine = async (req, res) => {
     res.json({ success: true, data: { machine }, message: 'Updated successfully' });
 
   } catch (error) {
+    console.error(error);
     res.status(500).json({ success: false, message: 'Update failed' });
   }
 };
 
-// 5. Delete machine (FIXED ID CHECK)
+// 5. Delete machine -> NO CHANGE
 exports.deleteMachine = async (req, res) => {
   try {
     const machine = await Machine.findById(req.params.id);
     if (!machine) return res.status(404).json({ success: false, message: 'Machine not found' });
 
-    // 👇 FIX: String Comparison
     if (machine.ownerId.toString() !== req.user.id.toString() && req.user.role !== 'admin') {
       return res.status(403).json({ success: false, message: 'Access Denied' });
     }
@@ -176,14 +231,13 @@ exports.deleteMachine = async (req, res) => {
   }
 };
 
-// 6. Toggle Availability (FIXED ID CHECK)
+// 6. Toggle Availability -> NO CHANGE
 exports.toggleAvailability = async (req, res) => {
   try {
     const { availability } = req.body;
     const machine = await Machine.findById(req.params.id);
     if (!machine) return res.status(404).json({ success: false });
 
-    // 👇 FIX: String Comparison
     if (machine.ownerId.toString() !== req.user.id.toString() && req.user.role !== 'admin') {
       return res.status(403).json({ success: false });
     }
@@ -197,7 +251,7 @@ exports.toggleAvailability = async (req, res) => {
   }
 };
 
-// 7. Get Owner's Machines
+// 7. Get Owner's Machines -> NO CHANGE
 exports.getMyMachines = async (req, res) => {
   try {
     const { page = 1, limit = 100 } = req.query;
@@ -223,7 +277,7 @@ exports.getMyMachines = async (req, res) => {
   }
 };
 
-// Helper: Calculate Distance
+// Helper: Calculate Distance -> NO CHANGE
 function calculateDistance(lat1, lon1, lat2, lon2) {
   const R = 6371; 
   const dLat = (lat2 - lat1) * Math.PI / 180;

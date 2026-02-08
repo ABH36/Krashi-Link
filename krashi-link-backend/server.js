@@ -18,7 +18,7 @@ const bookingRoutes = require('./src/routes/bookings');
 const paymentRoutes = require('./src/routes/payments');
 const reviewRoutes = require('./src/routes/reviews');
 const adminRoutes = require('./src/routes/admin');
-const notificationRoutes = require('./src/routes/notifications'); // ADDED THIS
+const notificationRoutes = require('./src/routes/notifications');
 
 // Import middleware
 const errorHandler = require('./src/middlewares/errorHandler');
@@ -45,8 +45,14 @@ socketService(io);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+// ✅ NEW: Make Uploads Folder Static/Public
+// Allows access to http://localhost:5000/uploads/image.jpg
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // Security Middleware
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" } // Allows loading images from frontend
+}));
 app.use(compression());
 
 // CORS Configuration
@@ -77,7 +83,7 @@ app.use('/api/bookings', bookingRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/notifications', notificationRoutes); // ADDED THIS
+app.use('/api/notifications', notificationRoutes);
 
 // Health Check Endpoint
 app.get('/api/health', (req, res) => {

@@ -1,73 +1,171 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext'; // Assuming you have this
+import { 
+  StarIcon, 
+  PencilSquareIcon, 
+  ShieldCheckIcon, 
+  UserGroupIcon, 
+  ChartBarIcon,
+  ChevronRightIcon 
+} from '@heroicons/react/24/outline';
 
 const ReviewPage = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  
+  // Default to farmer if no user found (for safety), or check actual role
+  const isOwner = user?.role === 'owner';
+
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900">Reviews</h1>
-          <p className="text-gray-600 mt-2">Manage and view your reviews</p>
-        </div>
-
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Farmer Section */}
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">As a Farmer</h2>
-            <p className="text-gray-600 mb-4">
-              Review machines and owners you've worked with
-            </p>
-            <div className="space-y-3">
-              <Link
-                to="/farmer/my-reviews"
-                className="block w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 text-center font-medium"
-              >
-                My Reviews Given
-              </Link>
-              <Link
-                to="/farmer/bookings"
-                className="block w-full border border-gray-300 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-50 text-center font-medium"
-              >
-                Bookings to Review
-              </Link>
-            </div>
+    <div className="min-h-screen bg-gray-50 py-10 px-4 animate-[fadeIn_0.3s_ease-out]">
+      <div className="max-w-5xl mx-auto">
+        
+        {/* Header */}
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center justify-center p-3 bg-yellow-100 text-yellow-600 rounded-full mb-4 shadow-sm">
+            <StarIcon className="w-8 h-8" />
           </div>
+          <h1 className="text-3xl font-bold text-gray-900">
+            {isOwner ? 'Reputation Manager' : 'Reviews & Ratings'}
+          </h1>
+          <p className="text-gray-500 mt-2 max-w-lg mx-auto">
+            {isOwner 
+              ? "Track your machine performance and build trust with farmers." 
+              : "Share your experience to help the community make better choices."}
+          </p>
+        </div>
 
-          {/* Owner Section */}
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">As an Owner</h2>
-            <p className="text-gray-600 mb-4">
-              View reviews for your machines and profile
-            </p>
-            <div className="space-y-3">
-              <Link
-                to="/owner/reviews"
-                className="block w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 text-center font-medium"
+        {/* 🚀 Action Grid (Role Based) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+          
+          {/* FARMER VIEW */}
+          {!isOwner && (
+            <>
+              {/* Write Review Card */}
+              <div 
+                onClick={() => navigate('/farmer/bookings')}
+                className="group bg-white p-8 rounded-2xl shadow-sm border border-gray-100 hover:shadow-xl transition-all cursor-pointer relative overflow-hidden"
               >
-                Reviews Received
-              </Link>
-              <Link
-                to="/owner/my-machines"
-                className="block w-full border border-gray-300 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-50 text-center font-medium"
+                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <PencilSquareIcon className="w-24 h-24 text-blue-600" />
+                </div>
+                <div className="relative z-10">
+                    <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center mb-4">
+                        <PencilSquareIcon className="w-6 h-6" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900">Rate a Booking</h3>
+                    <p className="text-gray-500 mt-2 text-sm">
+                        Pending reviews for completed jobs. Rate owners and machines.
+                    </p>
+                    <span className="inline-flex items-center text-blue-600 font-semibold mt-4 text-sm group-hover:translate-x-1 transition-transform">
+                        Go to Bookings <ChevronRightIcon className="w-4 h-4 ml-1" />
+                    </span>
+                </div>
+              </div>
+
+              {/* My Reviews Card */}
+              <div 
+                onClick={() => navigate('/farmer/my-reviews')}
+                className="group bg-white p-8 rounded-2xl shadow-sm border border-gray-100 hover:shadow-xl transition-all cursor-pointer relative overflow-hidden"
               >
-                My Machines
-              </Link>
+                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <StarIcon className="w-24 h-24 text-yellow-500" />
+                </div>
+                <div className="relative z-10">
+                    <div className="w-12 h-12 bg-yellow-50 text-yellow-600 rounded-xl flex items-center justify-center mb-4">
+                        <StarIcon className="w-6 h-6" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900">My Reviews</h3>
+                    <p className="text-gray-500 mt-2 text-sm">
+                        View and manage the feedback you've given to owners.
+                    </p>
+                    <span className="inline-flex items-center text-yellow-600 font-semibold mt-4 text-sm group-hover:translate-x-1 transition-transform">
+                        View History <ChevronRightIcon className="w-4 h-4 ml-1" />
+                    </span>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* OWNER VIEW */}
+          {isOwner && (
+            <>
+              {/* Received Reviews */}
+              <div 
+                onClick={() => navigate('/owner/reviews')}
+                className="group bg-white p-8 rounded-2xl shadow-sm border border-gray-100 hover:shadow-xl transition-all cursor-pointer relative overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <ChartBarIcon className="w-24 h-24 text-green-600" />
+                </div>
+                <div className="relative z-10">
+                    <div className="w-12 h-12 bg-green-50 text-green-600 rounded-xl flex items-center justify-center mb-4">
+                        <ChartBarIcon className="w-6 h-6" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900">Customer Feedback</h3>
+                    <p className="text-gray-500 mt-2 text-sm">
+                        See what farmers are saying about your service and machines.
+                    </p>
+                    <span className="inline-flex items-center text-green-600 font-semibold mt-4 text-sm group-hover:translate-x-1 transition-transform">
+                        View Ratings <ChevronRightIcon className="w-4 h-4 ml-1" />
+                    </span>
+                </div>
+              </div>
+
+              {/* My Machines (For Context) */}
+              <div 
+                onClick={() => navigate('/owner/my-machines')}
+                className="group bg-white p-8 rounded-2xl shadow-sm border border-gray-100 hover:shadow-xl transition-all cursor-pointer relative overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <ShieldCheckIcon className="w-24 h-24 text-purple-600" />
+                </div>
+                <div className="relative z-10">
+                    <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center mb-4">
+                        <ShieldCheckIcon className="w-6 h-6" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900">Machine Quality</h3>
+                    <p className="text-gray-500 mt-2 text-sm">
+                        Manage your inventory to ensure high standards and better ratings.
+                    </p>
+                    <span className="inline-flex items-center text-purple-600 font-semibold mt-4 text-sm group-hover:translate-x-1 transition-transform">
+                        Manage Inventory <ChevronRightIcon className="w-4 h-4 ml-1" />
+                    </span>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* 💡 Why it matters Section */}
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8">
+            <h3 className="text-center text-lg font-bold text-blue-900 mb-8">Why Reviews Matter?</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div className="text-center">
+                    <div className="mx-auto w-12 h-12 bg-white rounded-full flex items-center justify-center text-blue-500 shadow-sm mb-3">
+                        <ShieldCheckIcon className="w-6 h-6" />
+                    </div>
+                    <h4 className="font-bold text-gray-900">Build Trust</h4>
+                    <p className="text-sm text-gray-600 mt-1">Verified reviews help create a safe and reliable community.</p>
+                </div>
+                <div className="text-center">
+                    <div className="mx-auto w-12 h-12 bg-white rounded-full flex items-center justify-center text-green-500 shadow-sm mb-3">
+                        <StarIcon className="w-6 h-6" />
+                    </div>
+                    <h4 className="font-bold text-gray-900">Improve Quality</h4>
+                    <p className="text-sm text-gray-600 mt-1">Feedback helps owners improve their service and machines.</p>
+                </div>
+                <div className="text-center">
+                    <div className="mx-auto w-12 h-12 bg-white rounded-full flex items-center justify-center text-purple-500 shadow-sm mb-3">
+                        <UserGroupIcon className="w-6 h-6" />
+                    </div>
+                    <h4 className="font-bold text-gray-900">Help Others</h4>
+                    <p className="text-sm text-gray-600 mt-1">Your experience guides other farmers to make the right choice.</p>
+                </div>
             </div>
-          </div>
         </div>
 
-        {/* Info Section */}
-        <div className="mt-8 bg-blue-50 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-blue-800 mb-2">
-            Why Reviews Matter?
-          </h3>
-          <ul className="text-blue-700 space-y-2">
-            <li>✅ Help other farmers choose the right machines</li>
-            <li>✅ Build trust in the farming community</li>
-            <li>✅ Help owners improve their services</li>
-            <li>✅ Earn trust score points for helpful reviews</li>
-          </ul>
-        </div>
       </div>
     </div>
   );

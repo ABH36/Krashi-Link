@@ -1,8 +1,14 @@
 import api from './api';
 
 export const machineService = {
-  // Create new machine (Owner)
+  // Create new machine (Supports Image Upload)
   createMachine: (machineData) => {
+    // Check if we are sending a file (FormData)
+    if (machineData instanceof FormData) {
+      return api.post('/machines', machineData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+    }
     return api.post('/machines', machineData);
   },
 
@@ -22,8 +28,13 @@ export const machineService = {
     return api.get(`/machines/${id}`);
   },
 
-  // Update machine
+  // Update machine (Supports Image Upload)
   updateMachine: (id, updates) => {
+    if (updates instanceof FormData) {
+        return api.put(`/machines/${id}`, updates, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+    }
     return api.put(`/machines/${id}`, updates);
   },
 

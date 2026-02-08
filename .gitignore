@@ -1,2 +1,29 @@
+# ----- Common -----
+node_modules/
+.DS_Store
+Thumbs.db
+*.log
+logs/
+tmp/
+temp/
+
+# ----- Environment Files -----
 .env
-node_modules\
+
+# ----- Editor -----
+.vscode/
+.idea/
+
+# ----- Frontend Specific -----
+frontend/node_modules/
+frontend/build/
+frontend/dist/
+frontend/.cache/
+
+# ----- Backend Specific -----
+backend/node_modules/
+backend/dist/
+backend/build/
+backend/logs/
+backend/*.pid
+backend/*.seed

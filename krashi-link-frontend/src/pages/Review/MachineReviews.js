@@ -2,9 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import reviewService from '../../services/reviewService';
 import { machineService } from "../../services/machineService";
-
 import Loader from '../../components/common/Loader';
-import { StarIcon, UserIcon, CalendarIcon } from '@heroicons/react/24/outline';
+import { 
+  StarIcon, 
+  UserCircleIcon, 
+  CalendarDaysIcon, 
+  HandThumbUpIcon,
+  ArrowLeftIcon
+} from '@heroicons/react/24/solid';
+import { StarIcon as StarOutline } from '@heroicons/react/24/outline';
 
 const MachineReviews = () => {
   const { machineId } = useParams();
@@ -19,255 +25,146 @@ const MachineReviews = () => {
   });
 
   useEffect(() => {
-    fetchMachineReviews();
+    fetchData();
   }, [machineId]);
 
-  const fetchMachineReviews = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
-      
-      // Fetch machine details
-      const machineResponse = await machineService.getMachineById(machineId);
-      if (machineResponse.success) {
-        setMachine(machineResponse.data.machine);
-      }
+      const [machineRes, reviewsRes] = await Promise.all([
+          machineService.getMachineById(machineId),
+          reviewService.getMachineReviews(machineId)
+      ]);
 
-      // Fetch reviews
-      const reviewsResponse = await reviewService.getMachineReviews(machineId);
-      if (reviewsResponse.success) {
-        const reviewsData = reviewsResponse.data.reviews || [];
-        setReviews(reviewsData);
+      if (machineRes.success) setMachine(machineRes.data.machine);
+      
+      if (reviewsRes.success) {
+        const data = reviewsRes.data.reviews || [];
+        setReviews(data);
         
-        // Calculate stats
-        const total = reviewsData.length;
-        const average = reviewsData.reduce((sum, r) => sum + r.rating, 0) / total;
-        
-        const distribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
-        reviewsData.forEach(review => {
-          distribution[review.rating]++;
-        });
+        // Calculate Stats
+        const total = data.length;
+        const sum = data.reduce((acc, r) => acc + r.rating, 0);
+        const dist = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+        data.forEach(r => dist[r.rating] = (dist[r.rating] || 0) + 1);
 
         setStats({
-          averageRating: average || 0,
-          totalReviews: total,
-          ratingDistribution: distribution
+            averageRating: total ? sum / total : 0,
+            totalReviews: total,
+            ratingDistribution: dist
         });
-      } else {
-        setError('Failed to load reviews');
       }
-    } catch (error) {
-      console.error('Error fetching machine reviews:', error);
-      setError('Failed to load reviews. Please try again.');
+    } catch (err) {
+      setError('Could not load reviews.');
     } finally {
       setLoading(false);
     }
   };
 
-  const renderStars = (rating, size = 'w-4 h-4') => {
+  const renderStars = (rating) => {
     return (
-      <div className="flex space-x-1">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <StarIcon
-            key={star}
-            className={`${size} ${
-              star <= rating
-                ? 'text-yellow-400 fill-current'
-                : 'text-gray-300'
-            }`}
-          />
+      <div className="flex text-yellow-400">
+        {[...Array(5)].map((_, i) => (
+          i < Math.round(rating) ? <StarIcon key={i} className="w-4 h-4" /> : <StarOutline key={i} className="w-4 h-4 text-gray-300" />
         ))}
       </div>
     );
   };
 
-  const renderRatingBar = (stars, count, total) => {
-    const percentage = total > 0 ? (count / total) * 100 : 0;
-    
-    return (
-      <div className="flex items-center space-x-2 text-sm">
-        <span className="w-8">{stars} ★</span>
-        <div className="flex-1 bg-gray-200 rounded-full h-2">
-          <div
-            className="bg-yellow-400 h-2 rounded-full"
-            style={{ width: `${percentage}%` }}
-          ></div>
-        </div>
-        <span className="w-8 text-right text-gray-600">{count}</span>
-      </div>
-    );
-  };
-
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
-    });
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader size="large" text="Loading reviews..." />
-      </div>
-    );
-  }
+  if (loading) return <Loader text="Loading Feedback..." />;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 py-8 animate-[fadeIn_0.3s_ease-out]">
+      <div className="max-w-6xl mx-auto px-4">
+        
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">
-                Reviews for {machine?.name}
-              </h1>
-              <p className="text-gray-600 mt-2">
-                {machine?.ownerId?.name} • {machine?.type}
-              </p>
-            </div>
-            <Link
-              to={`/machine/${machineId}`}
-              className="text-blue-600 hover:text-blue-500 font-medium"
-            >
-              ← Back to Machine
+            <Link to={`/farmer/book-machine/${machineId}`} className="flex items-center text-sm text-gray-500 hover:text-green-600 mb-2 transition-colors">
+                <ArrowLeftIcon className="w-4 h-4 mr-1" /> Back to Machine
             </Link>
-          </div>
+            <h1 className="text-3xl font-bold text-gray-900">Reviews for {machine?.name}</h1>
+            <p className="text-gray-500">See what other farmers are saying</p>
         </div>
 
-        {/* Error Display */}
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <div className="flex items-center space-x-2">
-              <span className="text-red-700">{error}</span>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            {/* 📊 Sidebar Stats */}
+            <div className="lg:col-span-1">
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 sticky top-4">
+                    <div className="text-center mb-6">
+                        <div className="text-5xl font-extrabold text-gray-900">{stats.averageRating.toFixed(1)}</div>
+                        <div className="flex justify-center my-2 text-yellow-400">
+                            {[...Array(5)].map((_, i) => (
+                                <StarIcon key={i} className={`w-6 h-6 ${i < Math.round(stats.averageRating) ? 'text-yellow-400' : 'text-gray-200'}`} />
+                            ))}
+                        </div>
+                        <p className="text-sm text-gray-500">{stats.totalReviews} total ratings</p>
+                    </div>
+
+                    {/* Bars */}
+                    <div className="space-y-2">
+                        {[5, 4, 3, 2, 1].map(star => {
+                            const count = stats.ratingDistribution[star] || 0;
+                            const percent = stats.totalReviews ? (count / stats.totalReviews) * 100 : 0;
+                            return (
+                                <div key={star} className="flex items-center text-sm">
+                                    <span className="w-3 font-bold text-gray-600">{star}</span>
+                                    <StarIcon className="w-4 h-4 text-gray-400 mx-1" />
+                                    <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden mx-2">
+                                        <div className="h-full bg-yellow-400 rounded-full" style={{ width: `${percent}%` }}></div>
+                                    </div>
+                                    <span className="w-8 text-right text-gray-400 text-xs">{count}</span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
             </div>
-          </div>
-        )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Sidebar - Rating Summary */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-lg p-6 sticky top-8">
-              {/* Average Rating */}
-              <div className="text-center mb-6">
-                <div className="text-4xl font-bold text-gray-900 mb-2">
-                  {stats.averageRating.toFixed(1)}
-                </div>
-                {renderStars(Math.round(stats.averageRating), 'w-6 h-6')}
-                <div className="text-sm text-gray-600 mt-2">
-                  {stats.totalReviews} review{stats.totalReviews !== 1 ? 's' : ''}
-                </div>
-              </div>
+            {/* 📝 Reviews List */}
+            <div className="lg:col-span-2 space-y-4">
+                {reviews.length === 0 ? (
+                    <div className="text-center py-12 bg-white rounded-2xl border border-gray-200 border-dashed">
+                        <StarOutline className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                        <h3 className="text-lg font-bold text-gray-900">No Reviews Yet</h3>
+                        <p className="text-gray-500">Be the first to review this machine after booking!</p>
+                    </div>
+                ) : (
+                    reviews.map(review => (
+                        <div key={review._id} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                            <div className="flex justify-between items-start mb-3">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center text-blue-600">
+                                        <UserCircleIcon className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-bold text-gray-900 text-sm">{review.farmerId?.name || 'Farmer'}</h4>
+                                        <div className="flex items-center gap-2">
+                                            {renderStars(review.rating)}
+                                            <span className="text-xs text-gray-400">• {new Date(review.createdAt).toLocaleDateString()}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                {review.wouldRecommend && (
+                                    <span className="bg-green-50 text-green-700 px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1">
+                                        <HandThumbUpIcon className="w-3 h-3" /> Recommended
+                                    </span>
+                                )}
+                            </div>
+                            
+                            <p className="text-gray-600 text-sm leading-relaxed mb-4">
+                                {review.comment}
+                            </p>
 
-              {/* Rating Distribution */}
-              <div className="space-y-3">
-                <h3 className="text-sm font-medium text-gray-900">Rating Breakdown</h3>
-                {[5, 4, 3, 2, 1].map((rating) =>
-                  renderRatingBar(
-                    rating,
-                    stats.ratingDistribution[rating],
-                    stats.totalReviews
-                  )
+                            <div className="flex items-center gap-2 text-xs text-gray-400 border-t border-gray-50 pt-3">
+                                <CalendarDaysIcon className="w-4 h-4" />
+                                <span>Booked on {new Date(review.bookingId?.createdAt).toLocaleDateString()}</span>
+                            </div>
+                        </div>
+                    ))
                 )}
-              </div>
-
-              {/* Recommendation Rate */}
-              {reviews.filter(r => r.wouldRecommend).length > 0 && (
-                <div className="mt-6 p-4 bg-green-50 rounded-lg">
-                  <div className="text-2xl font-bold text-green-600 text-center">
-                    {Math.round((reviews.filter(r => r.wouldRecommend).length / stats.totalReviews) * 100)}%
-                  </div>
-                  <div className="text-sm text-green-700 text-center mt-1">
-                    Recommendation Rate
-                  </div>
-                </div>
-              )}
             </div>
-          </div>
 
-          {/* Main Content - Reviews List */}
-          <div className="lg:col-span-3">
-            {reviews.length === 0 ? (
-              <div className="bg-white rounded-lg shadow-lg p-8 text-center">
-                <StarIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  No Reviews Yet
-                </h3>
-                <p className="text-gray-600">
-                  This machine hasn't received any reviews yet. Be the first to leave a review after booking!
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {reviews.map((review) => (
-                  <div key={review._id} className="bg-white rounded-lg shadow-lg p-6">
-                    {/* Review Header */}
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                          <UserIcon className="w-5 h-5 text-blue-600" />
-                        </div>
-                        <div>
-                          <h4 className="font-medium text-gray-900">
-                            {review.farmerId?.name || 'Anonymous'}
-                          </h4>
-                          <div className="flex items-center space-x-2 mt-1">
-                            {renderStars(review.rating)}
-                            <span className="text-sm text-gray-500">
-                              {formatDate(review.createdAt)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {review.wouldRecommend && (
-                        <span className="bg-green-100 text-green-800 text-xs px-3 py-1 rounded-full font-medium">
-                          ✓ Recommended
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Review Content */}
-                    <div className="mb-4">
-                      <p className="text-gray-700 leading-relaxed">{review.comment}</p>
-                    </div>
-
-                    {/* Additional Info */}
-                    <div className="flex items-center space-x-4 text-sm text-gray-500 border-t border-gray-200 pt-4">
-                      <div className="flex items-center space-x-1">
-                        <CalendarIcon className="w-4 h-4" />
-                        <span>Booked on {formatDate(review.bookingId?.createdAt)}</span>
-                      </div>
-                      
-                      {review.farmerId?.trustScore && (
-                        <div className="flex items-center space-x-1">
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${
-                            review.farmerId.trustScore >= 70 
-                              ? 'bg-green-100 text-green-800' 
-                              : review.farmerId.trustScore >= 40 
-                              ? 'bg-yellow-100 text-yellow-800' 
-                              : 'bg-red-100 text-red-800'
-                          }`}>
-                            Trust Score: {review.farmerId.trustScore}%
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Load More (if paginated) */}
-            {reviews.length > 0 && (
-              <div className="mt-8 text-center">
-                <button className="bg-white border border-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-50 font-medium">
-                  Load More Reviews
-                </button>
-              </div>
-            )}
-          </div>
         </div>
       </div>
     </div>

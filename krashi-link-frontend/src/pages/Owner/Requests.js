@@ -5,55 +5,36 @@ import bookingService from '../../services/bookingService';
 import RequestItem from '../../components/owner/RequestItem';
 import Loader from '../../components/common/Loader';
 import Button from '../../components/common/Button';
+import { 
+  InboxIcon, 
+  ArchiveBoxIcon, 
+  CheckCircleIcon, 
+  ClockIcon 
+} from '@heroicons/react/24/outline';
 
 const Requests = () => {
   const { t } = useTranslation();
   const { socket, isConnected } = useSocket();
-  const [requests, setRequests] = useState([]);
+  
+  const [allRequests, setAllRequests] = useState([]); // Store ALL here
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('pending');
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 10,
-    total: 0,
-    pages: 0
-  });
+  const [pagination, setPagination] = useState({ page: 1, limit: 100, total: 0 });
 
   useEffect(() => {
     fetchRequests();
     setupSocketListeners();
-  }, [activeTab, pagination.page]);
+  }, []);
 
   const fetchRequests = async () => {
     try {
       setLoading(true);
-      
-      // FIX: Use getOwnerBookings instead of getUserBookings
-      const response = await bookingService.getOwnerBookings({
-        page: pagination.page,
-        limit: pagination.limit
-      });
-
+      const response = await bookingService.getOwnerBookings({ page: 1, limit: 100 });
       if (response.success) {
-        // Filter by status on the frontend since getOwnerBookings doesn't take status filter
-        let filteredBookings = response.data.bookings;
-        
-        if (activeTab === 'pending') {
-          filteredBookings = filteredBookings.filter(booking => booking.status === 'requested');
-        } else if (activeTab === 'confirmed') {
-          filteredBookings = filteredBookings.filter(booking => booking.status === 'owner_confirmed');
-        }
-        // For 'all' tab, we show all bookings
-
-        setRequests(filteredBookings);
-        setPagination(prev => ({
-          ...prev,
-          ...response.data.pagination,
-          total: filteredBookings.length // Update total for filtered results
-        }));
+        setAllRequests(response.data.bookings);
       }
     } catch (error) {
-      console.error('Error fetching requests:', error);
+      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -61,186 +42,101 @@ const Requests = () => {
 
   const setupSocketListeners = () => {
     if (!socket) return;
-
-    // Listen for new booking requests
-    socket.on('booking_request', (data) => {
-      console.log('New booking request received:', data);
-      if (activeTab === 'pending') {
-        fetchRequests();
-      }
-    });
-
-    // Listen for booking updates
-    socket.on('booking_confirmed_owner', (data) => {
-      console.log('Booking confirmed update:', data);
-      fetchRequests();
-    });
-
+    socket.on('booking_request', () => fetchRequests()); // Re-fetch on new request
+    socket.on('booking_confirmed_owner', () => fetchRequests());
     return () => {
       socket.off('booking_request');
       socket.off('booking_confirmed_owner');
     };
   };
 
+  // --- ⚡ CLIENT SIDE FILTERING (Fast UX) ---
+  const getFilteredRequests = () => {
+    switch(activeTab) {
+        case 'pending': return allRequests.filter(r => r.status === 'requested');
+        case 'active': return allRequests.filter(r => ['owner_confirmed', 'arrived_otp_verified', 'in_progress'].includes(r.status));
+        case 'history': return allRequests.filter(r => ['completed_pending_payment', 'paid', 'cancelled'].includes(r.status));
+        default: return allRequests;
+    }
+  };
+
+  const displayedRequests = getFilteredRequests();
+
   const handleRequestUpdate = (bookingId, updateData) => {
-    setRequests(prev => 
-      prev.map(request => 
-        request._id === bookingId 
-          ? { ...request, ...updateData }
-          : request
-      )
-    );
+    setAllRequests(prev => prev.map(req => req._id === bookingId ? { ...req, ...updateData } : req));
   };
 
-  const getStats = () => {
-    const allBookings = requests; // This is already filtered
-    const pending = allBookings.filter(r => r.status === 'requested').length;
-    const confirmed = allBookings.filter(r => r.status === 'owner_confirmed').length;
-    const total = allBookings.length;
-
-    return { pending, confirmed, total };
+  // Stats for Tabs
+  const counts = {
+      pending: allRequests.filter(r => r.status === 'requested').length,
+      active: allRequests.filter(r => ['owner_confirmed', 'arrived_otp_verified', 'in_progress'].includes(r.status)).length,
+      history: allRequests.filter(r => ['completed_pending_payment', 'paid', 'cancelled'].includes(r.status)).length
   };
 
-  const stats = getStats();
-
-  if (loading && requests.length === 0) {
-    return <Loader text="Loading requests..." />;
-  }
+  if (loading && allRequests.length === 0) return <Loader text="Loading requests..." />;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+    <div className="space-y-6 animate-[fadeIn_0.3s_ease-out]">
+      
+      {/* 🟢 Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Rental Requests</h1>
-          <p className="text-gray-600">Manage incoming booking requests for your machines</p>
+           <h1 className="text-2xl font-bold text-gray-900">Rental Requests</h1>
+           <p className="text-gray-500 text-sm">Manage bookings and driver assignments.</p>
         </div>
-        
-        <div className="mt-4 md:mt-0 flex items-center space-x-4">
-          <div className={`flex items-center text-sm ${
-            isConnected ? 'text-green-600' : 'text-red-600'
-          }`}>
-            <div className={`w-2 h-2 rounded-full mr-2 ${
-              isConnected ? 'bg-green-500' : 'bg-red-500'
-            }`}></div>
-            {isConnected ? 'Live' : 'Disconnected'}
-          </div>
-          
-          <Button
-            variant="secondary"
-            onClick={fetchRequests}
-          >
-            Refresh
-          </Button>
+        <div className="flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></span>
+            <span className="text-xs text-gray-500">{isConnected ? 'Live Updates On' : 'Offline'}</span>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="card text-center">
-          <div className="text-2xl font-bold text-blue-600">{stats.pending}</div>
-          <div className="text-sm text-gray-600">Pending Requests</div>
-        </div>
-        
-        <div className="card text-center">
-          <div className="text-2xl font-bold text-green-600">{stats.confirmed}</div>
-          <div className="text-sm text-gray-600">Confirmed</div>
-        </div>
-        
-        <div className="card text-center">
-          <div className="text-2xl font-bold text-gray-600">{stats.total}</div>
-          <div className="text-sm text-gray-600">Total Requests</div>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
+      {/* 🎛️ Tabs (Pill Style) */}
+      <div className="flex bg-gray-100 p-1 rounded-xl overflow-x-auto no-scrollbar">
           {[
-            { key: 'pending', name: 'Pending', count: stats.pending },
-            { key: 'confirmed', name: 'Confirmed', count: stats.confirmed },
-            { key: 'all', name: 'All Requests', count: stats.total }
+              { id: 'pending', label: 'New Requests', icon: ClockIcon, count: counts.pending },
+              { id: 'active', label: 'Active Jobs', icon: CheckCircleIcon, count: counts.active },
+              { id: 'history', label: 'History', icon: ArchiveBoxIcon, count: counts.history },
           ].map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => {
-                setActiveTab(tab.key);
-                setPagination(prev => ({ ...prev, page: 1 })); // Reset to page 1 when changing tabs
-              }}
-              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === tab.key
-                  ? 'border-primary-500 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              {tab.name}
-              {tab.count > 0 && (
-                <span className={`ml-2 py-0.5 px-2 text-xs rounded-full ${
-                  activeTab === tab.key
-                    ? 'bg-primary-100 text-primary-600'
-                    : 'bg-gray-100 text-gray-900'
-                }`}>
-                  {tab.count}
-                </span>
-              )}
-            </button>
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
+                    activeTab === tab.id 
+                    ? 'bg-white text-gray-900 shadow-sm' 
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                  <tab.icon className="w-4 h-4" />
+                  {tab.label}
+                  {tab.count > 0 && (
+                      <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] ${activeTab === tab.id ? 'bg-gray-100' : 'bg-white'}`}>
+                          {tab.count}
+                      </span>
+                  )}
+              </button>
           ))}
-        </nav>
       </div>
 
-      {/* Requests List */}
-      {requests.length === 0 ? (
-        <div className="card text-center py-12">
-          <div className="text-6xl mb-4">
-            {activeTab === 'pending' ? '📭' : '📋'}
-          </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">
-            {activeTab === 'pending' ? 'No Pending Requests' : 'No Requests Found'}
-          </h3>
-          <p className="text-gray-600">
-            {activeTab === 'pending' 
-              ? 'You don\'t have any pending rental requests at the moment.'
-              : 'No requests match your current filter.'
-            }
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {requests.map(request => (
-            <RequestItem
-              key={request._id}
-              request={request}
-              onUpdate={handleRequestUpdate}
-              onRefresh={fetchRequests} // Pass refresh function
-            />
-          ))}
-
-          {/* Pagination */}
-          {pagination.pages > 1 && (
-            <div className="flex justify-center items-center space-x-4 mt-8">
-              <Button
-                variant="secondary"
-                onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                disabled={pagination.page === 1}
-              >
-                Previous
-              </Button>
-              
-              <span className="text-sm text-gray-600">
-                Page {pagination.page} of {pagination.pages}
-              </span>
-              
-              <Button
-                variant="secondary"
-                onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                disabled={pagination.page === pagination.pages}
-              >
-                Next
-              </Button>
+      {/* 📋 Requests List */}
+      <div className="space-y-4">
+        {displayedRequests.length === 0 ? (
+            <div className="text-center py-20 bg-white rounded-xl border border-gray-200 border-dashed">
+                <InboxIcon className="w-12 h-12 mx-auto text-gray-300 mb-3" />
+                <h3 className="text-lg font-medium text-gray-900">No {activeTab} requests</h3>
+                <p className="text-gray-500 text-sm">When farmers book your machine, they will appear here.</p>
             </div>
-          )}
-        </div>
-      )}
+        ) : (
+            displayedRequests.map(request => (
+                <RequestItem
+                    key={request._id}
+                    request={request}
+                    onUpdate={handleRequestUpdate}
+                    onRefresh={fetchRequests}
+                />
+            ))
+        )}
+      </div>
+
     </div>
   );
 };

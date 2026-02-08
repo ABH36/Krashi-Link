@@ -1,58 +1,43 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom'; // useNavigate added
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import bookingService from '../../services/bookingService';
 import FarmerBookingActions from '../../components/farmer/FarmerBookingActions';
 import Loader from '../../components/common/Loader';
 import useBookingSocket from '../../hooks/useBookingSocket';
 import WhatsAppButton from '../../components/common/WhatsAppButton';
-import { useAuth } from '../../context/AuthContext'; // Import Auth Context
+import { useAuth } from '../../context/AuthContext';
 import { 
   ArrowLeftIcon, 
   CalendarIcon, 
-  ClockIcon, 
   UserIcon, 
   DevicePhoneMobileIcon, 
-  CurrencyRupeeIcon, 
   MapPinIcon, 
-  CheckBadgeIcon 
+  CurrencyRupeeIcon,
+  CheckCircleIcon
 } from '@heroicons/react/24/outline';
 
 const FarmerBookingDetails = () => {
   const { id } = useParams();
-  const { user } = useAuth(); // Get current user
+  const { user } = useAuth();
   const navigate = useNavigate();
   
   const [booking, setBooking] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [lastUpdate, setLastUpdate] = useState(null);
 
-  // Helper: Check if current user is the Owner
   const isOwner = user?.role === 'owner';
 
-  // Fetch booking details
   const fetchBooking = async () => {
     try {
       setLoading(true);
-      setError(null);
-      
       const response = await bookingService.getBookingById(id);
-      
       if (response.success) {
         setBooking(response.data.booking);
-        setLastUpdate(new Date());
       } else {
-        throw new Error(response.message || 'Failed to fetch booking');
+        throw new Error('Failed to fetch');
       }
     } catch (error) {
-      console.error('❌ Error fetching booking:', error);
-      if (error.response?.status === 403) {
-        setError('Access Denied: You do not have permission to view this booking.');
-      } else if (error.response?.status === 404) {
-        setError('Booking not found.');
-      } else {
-        setError('Failed to load booking details. Please try again.');
-      }
+      setError(error.message);
     } finally {
       setLoading(false);
     }
@@ -62,194 +47,153 @@ const FarmerBookingDetails = () => {
     fetchBooking();
   }, [id]);
 
-  const handleBookingUpdate = (updatedData) => {
-    console.log('🔄 Socket update received:', updatedData);
-    setBooking(prev => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        ...updatedData,
-        timer: { ...prev.timer, ...updatedData.timer },
-        billing: { ...prev.billing, ...updatedData.billing }
-      };
-    });
-    setLastUpdate(new Date());
-  };
+  useBookingSocket(id, (updatedData) => {
+    setBooking(prev => ({ ...prev, ...updatedData }));
+  });
 
-  useBookingSocket(id, handleBookingUpdate);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader size="large" text="Loading details..." />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="max-w-4xl mx-auto p-6">
-        <div className="bg-white rounded-lg shadow-md p-8 text-center">
-          <div className="text-red-600 mb-4"><span className="text-4xl">⚠️</span></div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Access Issue</h2>
-          <p className="text-gray-600 mb-6">{error}</p>
-          <button 
-             onClick={() => navigate(isOwner ? '/owner/requests' : '/farmer/bookings')}
-             className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
-           >
-             Go Back
-           </button>
-        </div>
-      </div>
-    );
-  }
-
+  if (loading) return <Loader text="Loading Details..." />;
+  if (error) return <div className="p-8 text-center text-red-600">{error}</div>;
   if (!booking) return null;
 
-  // --- 👇 DYNAMIC DATA LOGIC ---
-  // Agar main Owner hu, to mujhe Farmer ki details dikhni chahiye.
-  // Agar main Farmer hu, to mujhe Owner ki details dikhni chahiye.
   const displayContact = isOwner ? booking.farmerId : booking.ownerId;
-  const contactTitle = isOwner ? "Farmer Information" : "Owner Information";
-  const chatLabel = isOwner ? "Chat with Farmer" : "Chat with Owner";
-  
-  // WhatsApp Message customization
-  const waMessage = isOwner 
-    ? `Namaste ${displayContact?.name}, Regarding your booking for ${booking.machineId?.name} (ID: ${booking._id})...`
-    : `Namaste ${displayContact?.name}, Maine aapka machine (${booking.machineId?.name}) book kiya hai. Booking ID: ${booking._id}`;
-  
   const backLink = isOwner ? '/owner/requests' : '/farmer/bookings';
-  const backText = isOwner ? 'Back to Requests' : 'Back to My Bookings';
-  // --- 👆 DYNAMIC DATA LOGIC END ---
+
+  // --- 🚦 PROGRESS BAR LOGIC ---
+  const steps = ['requested', 'owner_confirmed', 'arrived_otp_verified', 'completed_pending_payment', 'paid'];
+  const currentStepIndex = steps.indexOf(booking.status) > -1 ? steps.indexOf(booking.status) : 0;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-6">
-          <Link 
-            to={backLink} 
-            className="inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-500 mb-4"
-          >
-            <ArrowLeftIcon className="w-4 h-4 mr-1" />
-            {backText}
-          </Link>
-          
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Booking Details</h1>
-              <p className="text-sm text-gray-600 mt-1">
-                Booking ID: <span className="font-mono">{booking._id}</span>
-              </p>
-            </div>
-            {lastUpdate && (
-              <div className="mt-2 sm:mt-0 flex items-center text-sm text-gray-500">
-                <ClockIcon className="w-4 h-4 mr-1" />
-                Last updated: {lastUpdate.toLocaleTimeString()}
-              </div>
-            )}
-          </div>
-        </div>
+    <div className="min-h-screen bg-gray-50 py-6 animate-[fadeIn_0.3s_ease-out]">
+      <div className="max-w-3xl mx-auto px-4">
+        
+        {/* Back Button */}
+        <Link to={backLink} className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-green-600 mb-4 transition-colors">
+          <ArrowLeftIcon className="w-4 h-4 mr-1" /> Back
+        </Link>
 
-        <div className="space-y-6">
-          {/* Status Banner */}
-          <div className={`p-4 rounded-lg border ${
-            booking.status === 'completed_pending_payment' ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'
-          }`}>
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">Current Status</h2>
-                <p className="text-sm font-medium text-blue-600 mt-1 capitalize">
-                  {booking.status.replace(/_/g, ' ')}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Main Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            
-            {/* Machine Info */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <DevicePhoneMobileIcon className="w-5 h-5 mr-2 text-blue-600" />
-                Machine Information
-              </h2>
-              <div className="space-y-3">
-                <p><span className="font-medium">Name:</span> {booking.machineId?.name}</p>
-                <p><span className="font-medium">Type:</span> {booking.machineId?.type}</p>
-              </div>
-            </div>
-
-            {/* Contact Info (Dynamic: Shows Farmer if Owner logged in, Owner if Farmer logged in) */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <UserIcon className="w-5 h-5 mr-2 text-green-600" />
-                {contactTitle}
-              </h2>
-              <div className="space-y-3">
-                <p><span className="font-medium">Name:</span> {displayContact?.name}</p>
-                <p><span className="font-medium">Contact:</span> {displayContact?.phone}</p>
-                
-                {/* Address if available */}
-                {displayContact?.address?.village && (
-                     <p className="flex items-center text-gray-600 text-sm">
-                        <MapPinIcon className="w-4 h-4 mr-1" />
-                        {displayContact.address.village}
-                     </p>
-                )}
-                
-                {/* Dynamic WhatsApp Button */}
-                <div className="pt-3">
-                    <WhatsAppButton 
-                      phoneNumber={displayContact?.phone}
-                      message={waMessage}
-                      label={chatLabel}
-                    />
+        {/* 🚨 Priority Alert Banner */}
+        {booking.status === 'completed_pending_payment' && (
+            <div className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded-r-lg mb-6 shadow-sm flex items-start justify-between">
+                <div>
+                    <h3 className="font-bold text-orange-800">Payment Pending</h3>
+                    <p className="text-sm text-orange-700 mt-1">
+                        Work is complete. Please clear the bill of ₹{booking.billing.calculatedAmount} to close this booking.
+                    </p>
                 </div>
-              </div>
-            </div>
-
-            {/* Schedule Info */}
-            <div className="bg-white rounded-lg shadow p-6">
-               <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <CalendarIcon className="w-5 h-5 mr-2 text-purple-600" />
-                Schedule
-              </h2>
-              <div className="space-y-3">
-                <p><span className="font-medium">Requested:</span> {new Date(booking.schedule.requestedStartAt).toLocaleString()}</p>
-                {booking.timer?.startedAt && (
-                   <p><span className="font-medium">Actual Start:</span> {new Date(booking.timer.startedAt).toLocaleString()}</p>
+                {!isOwner && (
+                    <button 
+                        onClick={() => navigate(`/farmer/payment/${booking._id}`)}
+                        className="bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-orange-700"
+                    >
+                        Pay Now
+                    </button>
                 )}
-              </div>
+            </div>
+        )}
+
+        {/* Header Card */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+            <div className="flex justify-between items-start">
+                <div>
+                    <h1 className="text-2xl font-bold text-gray-900 leading-tight">
+                        {booking.machineId?.name}
+                    </h1>
+                    <p className="text-sm text-gray-500 mt-1">Booking ID: #{booking._id.slice(-6).toUpperCase()}</p>
+                </div>
+                <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide">
+                    {booking.status.replace(/_/g, ' ')}
+                </span>
             </div>
 
-            {/* Billing Info */}
-            <div className="bg-white rounded-lg shadow p-6">
-               <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <CurrencyRupeeIcon className="w-5 h-5 mr-2 text-yellow-600" />
-                Billing
-              </h2>
-              <div className="space-y-3">
-                <p><span className="font-medium">Rate:</span> ₹{booking.billing.rate}/{booking.billing.unit}</p>
-                {booking.billing.calculatedAmount && (
-                    <div className="mt-2 p-3 bg-green-50 rounded border border-green-100">
-                        <p className="text-lg font-bold text-green-700">Total: ₹{booking.billing.calculatedAmount}</p>
-                    </div>
-                )}
-              </div>
+            {/* Progress Bar */}
+            <div className="mt-8 relative">
+                <div className="absolute top-1/2 left-0 w-full h-1 bg-gray-200 -z-10 rounded"></div>
+                <div 
+                    className="absolute top-1/2 left-0 h-1 bg-green-500 -z-10 rounded transition-all duration-500"
+                    style={{ width: `${(currentStepIndex / (steps.length - 1)) * 100}%` }}
+                ></div>
+                
+                <div className="flex justify-between">
+                    {steps.map((step, idx) => (
+                        <div key={step} className={`flex flex-col items-center ${idx <= currentStepIndex ? 'text-green-600' : 'text-gray-400'}`}>
+                            <div className={`w-4 h-4 rounded-full border-2 ${idx <= currentStepIndex ? 'bg-green-600 border-green-600' : 'bg-white border-gray-300'}`}></div>
+                        </div>
+                    ))}
+                </div>
             </div>
-          </div>
-
-          {/* Actions Section (Visible to Both, logic handled inside component) */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <FarmerBookingActions 
-              booking={booking} 
-              onUpdate={handleBookingUpdate} 
-              onRefresh={fetchBooking} 
-            />
-          </div>
         </div>
+
+        {/* 🧩 Content Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {/* Contact Card */}
+            <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-blue-50 rounded-full text-blue-600">
+                        <UserIcon className="w-5 h-5" />
+                    </div>
+                    <h3 className="font-bold text-gray-800">{isOwner ? 'Farmer' : 'Owner'} Details</h3>
+                </div>
+                
+                <div className="space-y-3">
+                    <p className="text-lg font-medium">{displayContact?.name}</p>
+                    <p className="text-sm text-gray-500 flex items-center gap-2">
+                        <DevicePhoneMobileIcon className="w-4 h-4" /> {displayContact?.phone}
+                    </p>
+                    {displayContact?.address?.village && (
+                        <p className="text-sm text-gray-500 flex items-center gap-2">
+                            <MapPinIcon className="w-4 h-4" /> {displayContact.address.village}
+                        </p>
+                    )}
+                    
+                    <div className="pt-2">
+                        <WhatsAppButton 
+                            phoneNumber={displayContact?.phone} 
+                            label={isOwner ? "Chat with Farmer" : "Chat with Owner"}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* Schedule & Billing */}
+            <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-purple-50 rounded-full text-purple-600">
+                        <CalendarIcon className="w-5 h-5" />
+                    </div>
+                    <h3 className="font-bold text-gray-800">Job Details</h3>
+                </div>
+
+                <div className="space-y-4">
+                    <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Requested Time</span>
+                        <span className="font-medium">{new Date(booking.schedule.requestedStartAt).toLocaleString()}</span>
+                    </div>
+                    
+                    <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Rate</span>
+                        <span className="font-medium">₹{booking.billing.rate}/{booking.billing.unit}</span>
+                    </div>
+
+                    {booking.billing.calculatedAmount && (
+                        <div className="pt-3 border-t border-gray-100 flex justify-between items-center">
+                            <span className="font-bold text-gray-800">Total Bill</span>
+                            <span className="text-xl font-bold text-green-600">₹{booking.billing.calculatedAmount}</span>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+
+        {/* 👇 Action Center (The Main Engine) */}
+        <div className="mt-6">
+            <FarmerBookingActions 
+                booking={booking} 
+                onUpdate={(data) => setBooking(prev => ({ ...prev, ...data }))} 
+                onRefresh={fetchBooking} 
+            />
+        </div>
+
       </div>
     </div>
   );

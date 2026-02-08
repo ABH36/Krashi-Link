@@ -3,11 +3,19 @@ import { useNavigate } from 'react-router-dom';
 import { useSocket } from '../../context/SocketContext';
 import bookingService from '../../services/bookingService';
 import Loader from '../../components/common/Loader';
+import { 
+  CalendarDaysIcon, 
+  MapPinIcon, 
+  CurrencyRupeeIcon, 
+  ChevronRightIcon,
+  ClockIcon,
+  InboxStackIcon
+} from '@heroicons/react/24/outline';
 
 const FarmerBookings = () => {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState('active'); // 'active' | 'history'
   const { socket, isConnected } = useSocket();
   const navigate = useNavigate();
 
@@ -15,13 +23,13 @@ const FarmerBookings = () => {
     try {
       const response = await bookingService.getUserBookings();
       if (response.success) {
-        setBookings(response.data.bookings);
+        // Sort by date desc (newest first)
+        setBookings(response.data.bookings.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
       }
     } catch (error) {
-      console.error('❌ Error fetching bookings:', error);
+      console.error('Error fetching bookings:', error);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   };
 
@@ -32,37 +40,16 @@ const FarmerBookings = () => {
   // Socket Listeners for Real-time updates
   useEffect(() => {
     if (socket && isConnected) {
-      socket.on('booking_confirmed', (data) => {
-        console.log('Booking confirmed socket event:', data);
-        // Update state directly to avoid reload
+      const updateBookingState = (data, newStatus, extraFields = {}) => {
         setBookings(prev => prev.map(b => 
-          b._id === data.bookingId 
-            ? { ...b, status: 'owner_confirmed', schedule: { ...b.schedule, arrivalDeadlineAt: data.arrivalDeadlineAt } } 
-            : b
+          b._id === data.bookingId ? { ...b, status: newStatus, ...extraFields } : b
         ));
-      });
+      };
 
-      socket.on('booking_rejected', (data) => {
-        setBookings(prev => prev.map(b => 
-          b._id === data.bookingId ? { ...b, status: 'cancelled' } : b
-        ));
-      });
-
-      socket.on('timer_started', (data) => {
-        setBookings(prev => prev.map(b => 
-          b._id === data.bookingId ? { ...b, status: 'arrived_otp_verified', timer: { startedAt: data.startedAt } } : b
-        ));
-      });
-      
-      socket.on('timer_stopped', (data) => {
-         setBookings(prev => prev.map(b => 
-          b._id === data.bookingId ? { 
-              ...b, 
-              status: 'completed_pending_payment', 
-              billing: { ...b.billing, calculatedAmount: data.calculatedAmount }
-          } : b
-        ));
-      });
+      socket.on('booking_confirmed', (data) => updateBookingState(data, 'owner_confirmed', { schedule: { ...data.schedule } }));
+      socket.on('booking_rejected', (data) => updateBookingState(data, 'cancelled'));
+      socket.on('timer_started', (data) => updateBookingState(data, 'arrived_otp_verified', { timer: { startedAt: data.startedAt } }));
+      socket.on('timer_stopped', (data) => updateBookingState(data, 'completed_pending_payment', { billing: { calculatedAmount: data.calculatedAmount } }));
 
       return () => {
         socket.off('booking_confirmed');
@@ -73,89 +60,137 @@ const FarmerBookings = () => {
     }
   }, [socket, isConnected]);
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    fetchBookings();
+  // --- FILTER LOGIC ---
+  const activeStatuses = ['requested', 'owner_confirmed', 'arrived_otp_verified', 'in_progress', 'completed_pending_payment'];
+  
+  const activeBookings = bookings.filter(b => activeStatuses.includes(b.status));
+  const historyBookings = bookings.filter(b => !activeStatuses.includes(b.status));
+
+  const displayedBookings = activeTab === 'active' ? activeBookings : historyBookings;
+
+  const getStatusConfig = (status) => {
+    const configs = {
+      requested: { color: 'bg-yellow-100 text-yellow-800', label: 'Requested' },
+      owner_confirmed: { color: 'bg-blue-100 text-blue-800', label: 'Confirmed' },
+      arrived_otp_verified: { color: 'bg-purple-100 text-purple-800', label: 'In Progress' },
+      in_progress: { color: 'bg-purple-100 text-purple-800', label: 'In Progress' },
+      completed_pending_payment: { color: 'bg-orange-100 text-orange-800', label: 'Payment Pending' },
+      paid: { color: 'bg-green-100 text-green-800', label: 'Completed' },
+      cancelled: { color: 'bg-red-100 text-red-800', label: 'Cancelled' },
+    };
+    return configs[status] || { color: 'bg-gray-100', label: status };
   };
 
-  // FIX: Corrected Route
-  const handleViewDetails = (bookingId) => {
-    navigate(`/farmer/bookings/${bookingId}`);
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'requested': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'owner_confirmed': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'arrived_otp_verified': return 'bg-purple-100 text-purple-800 border-purple-200';
-      case 'in_progress': return 'bg-indigo-100 text-indigo-800 border-indigo-200';
-      case 'completed_pending_payment': return 'bg-orange-100 text-orange-800 border-orange-200';
-      case 'paid': return 'bg-green-100 text-green-800 border-green-200';
-      case 'cancelled': return 'bg-red-100 text-red-800 border-red-200';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  if (loading) return <Loader text="Loading bookings..." />;
+  if (loading) return <Loader text="Loading your bookings..." />;
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-6">
+    <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+      
+      {/* Header */}
+      <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">My Bookings</h1>
-        <button 
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className="text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50 flex items-center gap-2"
+        {/* Refresh Icon Button could go here */}
+      </div>
+
+      {/* TABS */}
+      <div className="flex p-1 bg-gray-100 rounded-xl">
+        <button
+          onClick={() => setActiveTab('active')}
+          className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all ${
+            activeTab === 'active' 
+              ? 'bg-white text-gray-900 shadow-sm' 
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
         >
-           {refreshing ? 'Refreshing...' : 'Refresh List'}
+          Active ({activeBookings.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('history')}
+          className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all ${
+            activeTab === 'history' 
+              ? 'bg-white text-gray-900 shadow-sm' 
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          History
         </button>
       </div>
 
-      {bookings.length === 0 ? (
-        <div className="text-center py-16 border-2 border-dashed border-gray-300 rounded-xl bg-white">
-          <div className="text-5xl mb-4">🚜</div>
-          <h3 className="text-lg font-medium text-gray-900">No bookings yet</h3>
-          <p className="text-gray-500 mb-6">You haven't booked any machines yet.</p>
-          <button
-            onClick={() => navigate('/farmer/machines')}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
-          >
-            Find a Machine
-          </button>
-        </div>
-      ) : (
-        <div className="grid gap-4">
-          {bookings.map(booking => (
-            <div key={booking._id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h3 className="font-bold text-lg text-gray-900">{booking.machineId?.name || 'Unknown Machine'}</h3>
-                    <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium border ${getStatusColor(booking.status)}`}>
-                      {booking.status.replace(/_/g, ' ').toUpperCase()}
-                    </span>
+      {/* LIST */}
+      <div className="space-y-4">
+        {displayedBookings.length === 0 ? (
+          <div className="text-center py-16 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
+            <InboxStackIcon className="w-12 h-12 mx-auto text-gray-300 mb-3" />
+            <h3 className="text-lg font-medium text-gray-900">No {activeTab} bookings</h3>
+            <p className="text-gray-500 text-sm">
+              {activeTab === 'active' 
+                ? "You don't have any ongoing jobs." 
+                : "You haven't completed any jobs yet."}
+            </p>
+            {activeTab === 'active' && (
+                <button 
+                    onClick={() => navigate('/farmer/machines')}
+                    className="mt-4 text-blue-600 font-semibold text-sm hover:underline"
+                >
+                    Find a Machine
+                </button>
+            )}
+          </div>
+        ) : (
+          displayedBookings.map(booking => {
+            const statusConfig = getStatusConfig(booking.status);
+            return (
+              <div 
+                key={booking._id} 
+                onClick={() => navigate(`/farmer/bookings/${booking._id}`)}
+                className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer active:scale-[0.99]"
+              >
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h3 className="font-bold text-gray-900">{booking.machineId?.name}</h3>
+                    <p className="text-xs text-gray-500">ID: {booking._id.slice(-6).toUpperCase()}</p>
                   </div>
-                  <div className="text-sm text-gray-600 space-y-1">
-                    <p>Owner: <span className="font-medium">{booking.ownerId?.name}</span></p>
-                    <p>Date: {new Date(booking.schedule.requestedStartAt).toLocaleString()}</p>
-                    {booking.billing?.calculatedAmount && (
-                      <p className="font-bold text-green-600">Amount: ₹{booking.billing.calculatedAmount}</p>
-                    )}
-                  </div>
+                  <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide ${statusConfig.color}`}>
+                    {statusConfig.label}
+                  </span>
                 </div>
-                <div className="w-full md:w-auto">
-                  <button
-                    onClick={() => handleViewDetails(booking._id)}
-                    className="w-full md:w-auto bg-gray-50 text-gray-700 px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-100 font-medium text-sm transition-colors"
-                  >
-                    View Details
-                  </button>
+
+                <div className="grid grid-cols-2 gap-y-2 text-sm text-gray-600 mb-3">
+                   <div className="flex items-center gap-1.5">
+                      <CalendarDaysIcon className="w-4 h-4 text-gray-400" />
+                      <span>{new Date(booking.schedule.requestedStartAt).toLocaleDateString()}</span>
+                   </div>
+                   <div className="flex items-center gap-1.5">
+                      <ClockIcon className="w-4 h-4 text-gray-400" />
+                      <span>{new Date(booking.schedule.requestedStartAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                   </div>
+                   {booking.ownerId && (
+                       <div className="flex items-center gap-1.5 col-span-2">
+                          <div className="w-4 h-4 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-bold text-blue-600">
+                              {booking.ownerId.name[0]}
+                          </div>
+                          <span>{booking.ownerId.name}</span>
+                       </div>
+                   )}
+                </div>
+
+                {/* Amount or Action Hint */}
+                <div className="flex items-center justify-between border-t border-gray-100 pt-3 mt-2">
+                    <div className="flex items-center text-gray-900 font-bold">
+                        <CurrencyRupeeIcon className="w-4 h-4 mr-1 text-gray-400" />
+                        {booking.billing.calculatedAmount ? booking.billing.calculatedAmount : booking.billing.rate}
+                        {!booking.billing.calculatedAmount && <span className="text-xs text-gray-400 font-normal ml-1">/ {booking.billing.unit}</span>}
+                    </div>
+                    
+                    <div className="flex items-center text-xs font-semibold text-blue-600">
+                        View Details <ChevronRightIcon className="w-3 h-3 ml-1" />
+                    </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-      )}
+            );
+          })
+        )}
+      </div>
     </div>
   );
 };

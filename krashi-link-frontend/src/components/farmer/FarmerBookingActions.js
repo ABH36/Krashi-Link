@@ -1,38 +1,40 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom'; // ✅ Import Added
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import bookingService from '../../services/bookingService';
 import OTPModal from '../common/OTPModal';
 import Button from '../common/Button';
+import Toast from '../common/Toast'; // ✅ Using our custom Toast
 import { 
   CheckBadgeIcon, 
-  ExclamationTriangleIcon, 
-  ClockIcon 
+  ClockIcon, 
+  BanknotesIcon,
+  TruckIcon,
+  WrenchScrewdriverIcon,
+  ChevronRightIcon
 } from '@heroicons/react/24/outline';
 
 const FarmerBookingActions = ({ booking, onUpdate, onRefresh }) => {
   const { t } = useTranslation();
-  const navigate = useNavigate(); // ✅ Hook initialized
+  const navigate = useNavigate();
   const [showCompletionOTPModal, setShowCompletionOTPModal] = useState(false);
   const [verifyCompletionLoading, setVerifyCompletionLoading] = useState(false);
-  const [actionError, setActionError] = useState(null);
+  const [toast, setToast] = useState(null); // Toast State
 
   const handleVerifyCompletion = async (otp) => {
     setVerifyCompletionLoading(true);
-    setActionError(null);
-    
     try {
       const response = await bookingService.verifyCompletion(booking._id, otp);
-      
       if (response.success) {
         if (onUpdate) onUpdate(response.data);
         if (onRefresh) await onRefresh();
         setShowCompletionOTPModal(false);
-        alert('✅ Work completed! Bill generated.');
+        // ✅ Premium Toast instead of Alert
+        setToast({ type: 'success', message: 'Work marked as completed! Bill Generated.' });
       }
     } catch (error) {
       console.error('Verify completion error:', error);
-      setActionError('Failed to verify completion. Please try again.');
+      setToast({ type: 'error', message: 'Verification failed. Invalid OTP.' });
     } finally {
       setVerifyCompletionLoading(false);
     }
@@ -41,97 +43,129 @@ const FarmerBookingActions = ({ booking, onUpdate, onRefresh }) => {
   const handleResendCompletionOTP = async () => {
     try {
       await bookingService.resendOTP(booking._id, 'completion');
-      alert('OTP resent successfully!');
+      setToast({ type: 'info', message: 'OTP resent successfully to your mobile.' });
     } catch (error) {
-      setActionError('Failed to resend OTP.');
+      setToast({ type: 'error', message: 'Could not resend OTP. Try again.' });
     }
   };
 
-  const renderActionButtons = () => {
+  // --- 🎨 UI: Status Timeline Card ---
+  const StatusCard = ({ icon: Icon, colorClass, title, subtitle, children, active = true }) => (
+    <div className={`relative overflow-hidden rounded-xl border p-5 transition-all duration-300 ${
+      active 
+        ? `${colorClass} shadow-lg scale-[1.02]` 
+        : 'bg-gray-50 border-gray-100 opacity-60 grayscale'
+    }`}>
+      <div className="flex items-start gap-4">
+        <div className={`p-3 rounded-full bg-white shadow-sm ${active ? 'animate-pulse-slow' : ''}`}>
+           <Icon className="w-6 h-6" />
+        </div>
+        <div className="flex-1">
+          <h4 className="font-bold text-gray-900">{title}</h4>
+          <p className="text-sm text-gray-600 mt-1 mb-3 leading-relaxed">{subtitle}</p>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderContent = () => {
     switch (booking.status) {
       case 'requested':
         return (
-          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <div className="flex items-center space-x-2 mb-2">
-              <ClockIcon className="w-5 h-5 text-yellow-600" />
-              <span className="text-sm font-medium text-yellow-800">Waiting for Confirmation</span>
-            </div>
-            <p className="text-sm text-yellow-700">Request sent to owner.</p>
-          </div>
+          <StatusCard 
+            icon={ClockIcon} 
+            colorClass="bg-amber-50 border-amber-200 text-amber-700"
+            title="Request Sent"
+            subtitle="Machine owner ki confirmation ka intezaar hai. Wo 15 min me respond karenge."
+          >
+             <div className="mt-2 text-xs font-semibold bg-white/50 px-3 py-1 rounded inline-block text-amber-800 border border-amber-100">
+                ⏳ Waiting for approval...
+             </div>
+          </StatusCard>
         );
 
       case 'owner_confirmed':
         return (
-          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-center space-x-2 mb-2">
-              <CheckBadgeIcon className="w-5 h-5 text-blue-600" />
-              <span className="text-sm font-medium text-blue-800">Confirmed</span>
+          <StatusCard 
+            icon={TruckIcon} 
+            colorClass="bg-blue-50 border-blue-200 text-blue-700"
+            title="Booking Confirmed!"
+            subtitle="Owner ne request accept kar li hai. Machine jald hi farm par pahunchegi."
+          >
+            <div className="mt-2 flex items-center gap-2 text-sm text-blue-800 bg-white/60 p-2 rounded-lg">
+                <span className="w-2 h-2 bg-blue-500 rounded-full animate-ping"></span>
+                Machine is on the way
             </div>
-            <p className="text-sm text-blue-700">Owner will arrive shortly.</p>
-          </div>
+          </StatusCard>
         );
 
       case 'arrived_otp_verified':
         return (
-          <div className="space-y-4">
-            <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-              <div className="flex items-center space-x-2 mb-2">
-                <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
-                <span className="text-sm font-medium text-purple-800">Work In Progress</span>
-              </div>
-              <p className="text-sm text-purple-700">Timer is running.</p>
-            </div>
-            <div className="text-center">
-              <Button
+          <StatusCard 
+            icon={WrenchScrewdriverIcon} 
+            colorClass="bg-purple-50 border-purple-200 text-purple-700"
+            title="Work In Progress"
+            subtitle="Kaam chal raha hai. Jab kaam khatam ho jaye, tab niche diya gaya button dabayein."
+          >
+            <div className="mt-4">
+               <Button
                 variant="primary"
                 size="lg"
                 onClick={() => setShowCompletionOTPModal(true)}
-                className="w-full"
+                className="w-full shadow-purple-500/20 shadow-lg"
               >
                 <CheckBadgeIcon className="w-5 h-5 mr-2" />
-                Verify Job Completion
+                Finish Work & Verify
               </Button>
+              <p className="text-xs text-center mt-2 text-purple-600">
+                Owner aapko OTP batayenge
+              </p>
             </div>
-            {actionError && <p className="text-sm text-red-600 text-center">{actionError}</p>}
-          </div>
+          </StatusCard>
         );
 
       case 'completed_pending_payment':
         return (
-          <div className="space-y-4">
-            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="text-sm font-medium text-green-800">Work Completed!</p>
-                  <p className="text-2xl font-bold text-green-900 mt-1">
-                    ₹{booking.billing.calculatedAmount}
-                  </p>
+          <StatusCard 
+            icon={BanknotesIcon} 
+            colorClass="bg-green-50 border-green-200 text-green-700"
+            title="Payment Pending"
+            subtitle="Kaam pura ho gaya hai. Bill generate ho chuka hai."
+          >
+            <div className="bg-white p-4 rounded-xl border border-green-100 shadow-sm mt-2 mb-4">
+                <div className="flex justify-between items-end">
+                    <span className="text-sm text-gray-500">Total Bill Amount</span>
+                    <span className="text-2xl font-bold text-gray-900">₹{booking.billing.calculatedAmount}</span>
                 </div>
-                <CheckBadgeIcon className="w-8 h-8 text-green-600" />
-              </div>
             </div>
             
-            <div className="text-center p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <p className="text-sm text-yellow-800 mb-3">
-                Please complete the payment.
-              </p>
-              {/* 👇 FIXED BUTTON LOGIC HERE 👇 */}
-              <Button
-                variant="primary"
-                className="w-full"
-                onClick={() => navigate(`/farmer/payment/${booking._id}`)}
-              >
-                💳 Pay Now
-              </Button>
-            </div>
-          </div>
+            <Button
+              variant="primary"
+              className="w-full py-3 text-lg shadow-green-600/30 animate-pulse"
+              onClick={() => navigate(`/farmer/payment/${booking._id}`)}
+            >
+              💳 Pay Now
+            </Button>
+          </StatusCard>
         );
 
       case 'paid':
         return (
-          <div className="p-4 bg-green-100 border border-green-200 rounded-lg text-center">
-            <p className="text-green-800 font-bold">Paid & Closed</p>
-          </div>
+          <StatusCard 
+            icon={CheckBadgeIcon} 
+            colorClass="bg-gray-50 border-gray-200 text-gray-500"
+            title="Completed & Paid"
+            subtitle="Payment successful. Thank you for using KrishiLink!"
+            active={false}
+          >
+             <button 
+                onClick={() => navigate(`/farmer/bookings`)}
+                className="text-sm text-green-600 font-semibold hover:underline flex items-center mt-2"
+             >
+                View Receipt <ChevronRightIcon className="w-4 h-4 ml-1" />
+             </button>
+          </StatusCard>
         );
 
       default:
@@ -140,10 +174,28 @@ const FarmerBookingActions = ({ booking, onUpdate, onRefresh }) => {
   };
 
   return (
-    <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">Booking Actions</h3>
-      {renderActionButtons()}
+    <div className="space-y-4 animate-[fadeIn_0.3s_ease-out]">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-4">
+        <h3 className="text-lg font-bold text-gray-900">Action Required</h3>
+        <span className="text-xs font-medium px-2 py-1 bg-gray-100 rounded text-gray-500 uppercase tracking-wide">
+            {booking.status.replace(/_/g, ' ')}
+        </span>
+      </div>
+
+      {/* Main Dynamic Card */}
+      {renderContent()}
       
+      {/* Toast Notification */}
+      {toast && (
+        <Toast 
+            message={toast.message} 
+            type={toast.type} 
+            onClose={() => setToast(null)} 
+        />
+      )}
+
+      {/* OTP Modal */}
       <OTPModal
         isOpen={showCompletionOTPModal}
         onClose={() => setShowCompletionOTPModal(false)}
@@ -153,6 +205,7 @@ const FarmerBookingActions = ({ booking, onUpdate, onRefresh }) => {
         loading={verifyCompletionLoading}
         resendCooldown={30}
         title="Verify Job Completion"
+        // Phone number prop can be passed if available in booking.ownerId.phone
       />
     </div>
   );

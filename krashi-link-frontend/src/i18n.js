@@ -20,6 +20,32 @@ const resources = {
         register: 'Register',
         or: 'OR'
       },
+
+      auth: {
+  register: "Register",
+  name: "Full Name",
+  phone: "Phone Number",
+  role: "Select Role",
+  farmer: "Farmer",
+  owner: "Owner",
+  password: "Password",
+  confirmPassword: "Confirm Password",
+
+  validation: {
+    nameRequired: "Name is required",
+    nameMin: "Name must be at least 2 characters",
+    phoneRequired: "Phone number is required",
+    phoneInvalid: "Enter a valid 10-digit phone number",
+    passwordRequired: "Password is required",
+    passwordMin: "Password must be at least 6 characters",
+    roleRequired: "Role is required"
+  },
+
+  haveAccount: "Already have an account?",
+  noAccount: "Are you a new member?",
+  login: "Login"
+},
+
       farmer: {
         activeBookings: 'Active Bookings',
         completedJobs: 'Completed Jobs',
@@ -94,6 +120,32 @@ const resources = {
         register: 'रजिस्टर',
         or: 'या'
       },
+
+      auth: {
+  register: "रजिस्टर करें",
+  name: "पूरा नाम",
+  phone: "फ़ोन नंबर",
+  role: "भूमिका चुनें",
+  farmer: "किसान",
+  owner: "मालिक",
+  password: "पासवर्ड",
+  confirmPassword: "पासवर्ड की पुष्टि करें",
+
+  validation: {
+    nameRequired: "नाम आवश्यक है",
+    nameMin: "नाम कम से कम 2 अक्षरों का होना चाहिए",
+    phoneRequired: "फ़ोन नंबर आवश्यक है",
+    phoneInvalid: "मान्य 10 अंकों का फ़ोन नंबर दर्ज करें",
+    passwordRequired: "पासवर्ड आवश्यक है",
+    passwordMin: "पासवर्ड कम से कम 6 अक्षरों का होना चाहिए",
+    roleRequired: "भूमिका आवश्यक है"
+  },
+
+  haveAccount: "क्या आपका पहले से खाता है?",
+  noAccount: "क्या आप नए सदस्य हैं?",
+  login: "लॉगिन"
+},
+
       farmer: {
         activeBookings: 'चल रही बुकिंग',
         completedJobs: 'पूर्ण कार्य',

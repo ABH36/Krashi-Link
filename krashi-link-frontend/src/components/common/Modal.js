@@ -1,7 +1,22 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 
 const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
+  
+  // CHANGE 1: Body Scroll Lock
+  // Jab modal khule, to peeche ka page scroll nahi hona chahiye.
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    // Cleanup function: Jab modal band ho ya component hate, scroll wapas on kar do
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const sizeClasses = {
@@ -12,32 +27,49 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-        {/* Background overlay */}
-        <div 
-          className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75"
-          onClick={onClose}
-        ></div>
+    <div className="relative z-50">
+      
+      {/* Background Overlay with BLUR Effect */}
+      <div 
+        className="fixed inset-0 bg-gray-900/75 backdrop-blur-sm transition-opacity" 
+        onClick={onClose}
+        aria-hidden="true"
+      ></div>
 
-        {/* Modal panel */}
-        <div className={`relative inline-block w-full ${sizeClasses[size]} px-4 pt-5 pb-4 overflow-hidden text-left align-bottom transition-all transform bg-white rounded-lg shadow-xl sm:my-8 sm:align-middle sm:p-6`}>
-          {/* Header */}
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-medium text-gray-900">
-              {title}
-            </h3>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <XMarkIcon className="w-6 h-6" />
-            </button>
-          </div>
+      {/* Modal Positioning Wrapper */}
+      <div className="fixed inset-0 z-10 overflow-y-auto">
+        <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+          
+          {/* Modal Panel */}
+          {/* Added 'animate-in fade-in zoom-in-95 duration-200' for smooth entry without libraries */}
+          <div className={`
+            relative transform overflow-hidden rounded-xl bg-white text-left shadow-2xl transition-all 
+            sm:my-8 w-full ${sizeClasses[size]}
+            animate-[fadeIn_0.2s_ease-out_forwards]
+          `}>
+            
+            {/* CHANGE 2: Sticky Header */}
+            {/* Header ab top par chipka rahega agar content lamba hai */}
+            <div className="sticky top-0 z-10 bg-white border-b border-gray-100 px-4 py-4 sm:px-6 flex items-center justify-between">
+              <h3 className="text-lg font-semibold leading-6 text-gray-900">
+                {title}
+              </h3>
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors"
+              >
+                <span className="sr-only">Close</span>
+                <XMarkIcon className="h-6 w-6" aria-hidden="true" />
+              </button>
+            </div>
 
-          {/* Content */}
-          <div>
-            {children}
+            {/* Scrollable Content Area */}
+            {/* max-h-[70vh] ensures modal never goes off-screen on mobile */}
+            <div className="px-4 py-5 sm:p-6 max-h-[75vh] overflow-y-auto">
+              {children}
+            </div>
+            
           </div>
         </div>
       </div>
