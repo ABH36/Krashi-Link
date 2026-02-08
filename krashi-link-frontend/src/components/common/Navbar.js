@@ -7,7 +7,6 @@ import { useTranslation } from 'react-i18next';
 import NotificationBell from './NotificationBell';
 import Toast from './Toast';
 import { 
-  HomeIcon, 
   UserIcon, 
   LanguageIcon, 
   ChevronDownIcon, 
@@ -85,17 +84,21 @@ const Navbar = () => {
     <>
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       
-      {/* CHANGE 1: Glassmorphism Effect (backdrop-blur) */}
-      <nav className="sticky top-0 z-40 w-full bg-white/80 backdrop-blur-md border-b border-gray-200 shadow-sm transition-all">
+      {/* Glassmorphism Navbar */}
+      <nav className="sticky top-0 z-40 w-full bg-white/85 backdrop-blur-lg border-b border-green-100/50 shadow-sm transition-all">
         <div className="container mx-auto px-4">
           <div className="flex justify-between items-center h-16">
             
-            {/* Logo Area */}
-            <Link to={getDashboardPath()} className="flex items-center space-x-2 group">
-              <div className="w-9 h-9 bg-gradient-to-br from-green-500 to-green-700 rounded-xl flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
-                <HomeIcon className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-800 to-gray-600">
+            {/* ✅ LOGO AREA (Updated to use public/logo.png) */}
+            <Link to={getDashboardPath()} className="flex items-center gap-3 group">
+              {/* Logo Image */}
+              <img 
+                src="/logo.png" 
+                alt="KrishiLink Logo" 
+                className="w-10 h-10 object-contain drop-shadow-md group-hover:scale-110 transition-transform duration-300"
+              />
+              {/* App Name with Gradient */}
+              <span className="text-xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-green-700 to-emerald-600 tracking-tight">
                 {t('app.name')}
               </span>
             </Link>
@@ -104,7 +107,7 @@ const Navbar = () => {
             <div className="hidden md:flex items-center space-x-2">
               <button 
                 onClick={toggleLanguage} 
-                className="flex items-center space-x-1 px-3 py-2 rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-100 transition-colors"
+                className="flex items-center space-x-1 px-3 py-2 rounded-lg text-sm font-medium text-gray-500 hover:bg-green-50 hover:text-green-700 transition-colors border border-transparent hover:border-green-100"
               >
                 <LanguageIcon className="w-4 h-4" />
                 <span>{isHindi ? 'English' : 'हिंदी'}</span>
@@ -151,14 +154,14 @@ const Navbar = () => {
                         </div>
                         <div className="py-1">
                           <Link to="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700" onClick={() => setIsProfileOpen(false)}>
-                            Your Profile
+                            <UserIcon className="w-4 h-4 inline mr-2"/>
+                            {t('profile.title')}
                           </Link>
-                          {/* Add other profile links here */}
                         </div>
                         <div className="py-1 border-t border-gray-50">
                           <button onClick={handleLogout} className="flex w-full items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50">
                             <ArrowRightOnRectangleIcon className="w-4 h-4 mr-2" />
-                            {t('auth.logout')}
+                            {t('common.logout')}
                           </button>
                         </div>
                       </div>
@@ -168,10 +171,10 @@ const Navbar = () => {
               ) : (
                 <div className="flex items-center space-x-3 ml-4">
                   <Link to="/login" className="text-sm font-medium text-gray-600 hover:text-green-600 px-3 py-2">
-                    {t('Login')}
+                    {t('common.login')}
                   </Link>
                   <Link to="/register" className="text-sm font-medium bg-green-600 text-white px-5 py-2.5 rounded-lg hover:bg-green-700 shadow-lg shadow-green-600/20 transition-all active:scale-95">
-                    {t('Register')}
+                    {t('common.register')}
                   </Link>
                 </div>
               )}
@@ -182,7 +185,7 @@ const Navbar = () => {
               {user && <NotificationBell />}
               <button 
                 onClick={() => setIsMenuOpen(!isMenuOpen)} 
-                className="p-2 rounded-lg text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="p-2 rounded-lg text-gray-600 hover:bg-green-50 hover:text-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors"
               >
                 {isMenuOpen ? <XMarkIcon className="w-6 h-6" /> : <Bars3Icon className="w-6 h-6" />}
               </button>
@@ -190,18 +193,18 @@ const Navbar = () => {
           </div>
         </div>
 
-        {/* CHANGE 3: Mobile Menu with Smooth Transition */}
+        {/* Mobile Menu with Smooth Transition */}
         <div className={`md:hidden overflow-hidden transition-all duration-300 ease-in-out ${isMenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
           <div className="px-4 pt-2 pb-6 space-y-2 bg-white border-t border-gray-100 shadow-inner">
             <button onClick={toggleLanguage} className="flex w-full items-center space-x-2 px-4 py-3 text-gray-600 hover:bg-gray-50 rounded-lg">
-              <LanguageIcon className="w-5 h-5" />
-              <span>{isHindi ? 'Switch to English' : 'हिंदी'}</span>
+              <LanguageIcon className="w-5 h-5 text-green-600" />
+              <span>{isHindi ? 'Switch to English' : 'हिंदी में बदलें'}</span>
             </button>
             
             {user ? (
               <>
-                <div className="px-4 py-3 bg-gray-50 rounded-lg flex items-center space-x-3 mb-2">
-                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-700 font-bold">
+                <div className="px-4 py-3 bg-green-50/50 border border-green-100 rounded-lg flex items-center space-x-3 mb-2">
+                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-700 font-bold border border-green-200">
                      {user.name.charAt(0).toUpperCase()}
                   </div>
                   <div>
@@ -226,17 +229,17 @@ const Navbar = () => {
                 <div className="border-t border-gray-100 my-2 pt-2">
                     <button onClick={handleLogout} className="flex w-full items-center px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg font-medium">
                         <ArrowRightOnRectangleIcon className="w-5 h-5 mr-2" />
-                        Logout
+                        {t('common.logout')}
                     </button>
                 </div>
               </>
             ) : (
               <div className="grid grid-cols-2 gap-4 pt-2">
-                <Link to="/login" className="flex items-center justify-center px-4 py-3 border border-gray-200 rounded-lg text-gray-700 font-medium" onClick={()=>setIsMenuOpen(false)}>
-                    Login
+                <Link to="/login" className="flex items-center justify-center px-4 py-3 border border-gray-200 rounded-lg text-gray-700 font-medium hover:bg-gray-50" onClick={()=>setIsMenuOpen(false)}>
+                    {t('common.login')}
                 </Link>
-                <Link to="/register" className="flex items-center justify-center px-4 py-3 bg-green-600 text-white rounded-lg font-medium shadow-lg shadow-green-600/20" onClick={()=>setIsMenuOpen(false)}>
-                    Register
+                <Link to="/register" className="flex items-center justify-center px-4 py-3 bg-green-600 text-white rounded-lg font-medium shadow-lg shadow-green-600/20 active:scale-95" onClick={()=>setIsMenuOpen(false)}>
+                    {t('common.register')}
                 </Link>
               </div>
             )}
