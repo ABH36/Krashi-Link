@@ -5,13 +5,38 @@ const { verifyToken } = require('../middlewares/auth');
 const { requireRole, requireVerified } = require('../middlewares/role');
 const validate = require('../middlewares/validation');
 
-// Validation schemas
+// --- 🛡️ VALIDATION SCHEMAS ---
 
+// 1. Register Schema (Added for safety)
+const registerSchema = {
+  body: {
+    name: { type: 'string', required: true, minLength: 2 },
+    phone: { type: 'string', pattern: /^[6-9]\d{9}$/, required: true },
+    password: { type: 'string', minLength: 6, required: true },
+    role: { type: 'string', enum: ['farmer', 'owner'], required: true }
+  }
+};
 
 const loginSchema = {
   body: {
     phone: { type: 'string', pattern: /^[6-9]\d{9}$/, required: true },
     password: { type: 'string', required: true }
+  }
+};
+
+// 2. Forgot Password Schema (New)
+const forgotPasswordSchema = {
+  body: {
+    phone: { type: 'string', pattern: /^[6-9]\d{9}$/, required: true }
+  }
+};
+
+// 3. Reset Password Schema (New)
+const resetPasswordSchema = {
+  body: {
+    phone: { type: 'string', pattern: /^[6-9]\d{9}$/, required: true },
+    otp: { type: 'string', length: 6, required: true },
+    newPassword: { type: 'string', minLength: 6, required: true }
   }
 };
 
@@ -21,20 +46,27 @@ const twoFASchema = {
   }
 };
 
+// Fixed: Changed 'name' to 'code' because 2FA requires OTP code
 const verify2FASchema = {
   body: {
-    name: { type: "string", required: true }
-
+    code: { type: "string", required: true, length: 6 }
   }
 };
 
-// Public routes
-router.post('/register', authController.register);
+// --- 🛣️ ROUTES ---
 
+// Public routes
+router.post('/register', validate(registerSchema), authController.register); // Added validation
 router.post('/login', validate(loginSchema), authController.login);
+
+// ✅ NEW: Forgot & Reset Password (With Validation)
+router.post('/forgot-password', validate(forgotPasswordSchema), authController.forgotPassword);
+router.post('/reset-password', validate(resetPasswordSchema), authController.resetPassword);
 
 // Protected routes
 router.get('/me', verifyToken, authController.getMe);
+
+// 2FA Routes
 router.post('/2fa/send', verifyToken, requireRole(['owner', 'admin']), requireVerified, validate(twoFASchema), authController.send2FA);
 router.post('/2fa/verify', verifyToken, requireRole(['owner', 'admin']), requireVerified, validate(verify2FASchema), authController.verify2FA);
 

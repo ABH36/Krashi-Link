@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext'; // ✅ CHANGED: Added useAuth
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import { LocaleProvider } from './context/LocaleContext';
 import Navbar from './components/common/Navbar';
 import LoadingSpinner from './components/common/Loader';
-import BottomNav from './components/common/BottomNav'; // ✅ NEW: Bottom Navigation
-import InstallPWA from './components/common/InstallPWA';
+import BottomNav from './components/common/BottomNav';
+import InstallPWA from './components/common/InstallPWA'; // ✅ Custom Install Button
 import UpdateToast from './components/common/UpdateToast';
+import SplashScreen from './components/common/SplashScreen'; // ✅ NEW: Splash Screen
 import * as serviceWorkerRegistration from './serviceWorkerRegistration';
 
 // --- Lazy Load Pages ---
@@ -15,6 +16,7 @@ const AdminBroadcast = React.lazy(() => import('./pages/Admin/Broadcast'));
 const AdminActivityLogs = React.lazy(() => import('./pages/Admin/ActivityLogs'));
 const Login = React.lazy(() => import('./pages/Auth/Login'));
 const Register = React.lazy(() => import('./pages/Auth/Register'));
+const ForgotPassword = React.lazy(() => import('./pages/Auth/ForgotPassword')); // ✅ NEW Route
 const FarmerDashboard = React.lazy(() => import('./pages/Farmer/Dashboard'));
 const OwnerDashboard = React.lazy(() => import('./pages/Owner/Dashboard'));
 const AdminDashboard = React.lazy(() => import('./pages/Admin/Dashboard'));
@@ -35,7 +37,7 @@ const PaymentHistory = React.lazy(() => import('./pages/Payment/PaymentHistory')
 const ReviewForm = React.lazy(() => import('./pages/Review/ReviewForm'));
 const MyReviews = React.lazy(() => import('./pages/Review/MyReviews'));
 const MachineReviews = React.lazy(() => import('./pages/Review/MachineReviews'));
-const OwnerEarnings = React.lazy(() => import('./pages/Owner/Earnings')); // ✅ Ensure this exists
+const OwnerEarnings = React.lazy(() => import('./pages/Owner/Earnings'));
 
 // --- Helpers ---
 class ErrorBoundary extends React.Component {
@@ -65,9 +67,8 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-// --- ✅ FIX: Updated ProtectedRoute to use Context ---
 const ProtectedRoute = ({ children, allowedRoles }) => {
-  const { user, loading } = useAuth(); // Now using hook instead of direct localStorage
+  const { user, loading } = useAuth();
 
   if (loading) return <LoadingSpinner />;
   if (!user) return <Navigate to="/login" replace />;
@@ -76,9 +77,8 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   return children;
 };
 
-// --- ✅ FIX: Updated RoleRedirect to use Context ---
 const RoleRedirect = () => {
-  const { user, loading } = useAuth(); // Now using hook
+  const { user, loading } = useAuth();
 
   if (loading) return <LoadingSpinner />;
   if (!user) return <Navigate to="/login" replace />;
@@ -93,6 +93,7 @@ const RoleRedirect = () => {
 function App() {
   const [waitingWorker, setWaitingWorker] = useState(null);
   const [showUpdate, setShowUpdate] = useState(false);
+  const [showSplash, setShowSplash] = useState(true); // ✅ Splash State
 
   useEffect(() => {
     serviceWorkerRegistration.register({
@@ -102,6 +103,13 @@ function App() {
       },
       onSuccess: () => console.log('PWA: Content is cached for offline use.')
     });
+
+    // ✅ SHOW SPLASH FOR 2.5 SECONDS (Platform Vibe)
+    const timer = setTimeout(() => {
+        setShowSplash(false);
+    }, 2500);
+
+    return () => clearTimeout(timer);
   }, []);
 
   const updateServiceWorker = () => {
@@ -109,6 +117,11 @@ function App() {
     setShowUpdate(false);
     window.location.reload();
   };
+
+  // ✅ Show Splash Screen First (Before Router loads)
+  if (showSplash) {
+      return <SplashScreen />;
+  }
 
   return (
     <ErrorBoundary>
@@ -118,7 +131,7 @@ function App() {
             <Router>
               <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
                 
-                {/* 1. Top Navbar (Logo & Desktop Menu) */}
+                {/* 1. Top Navbar */}
                 <Navbar />
                 
                 {/* 2. PWA Update Notification */}
@@ -130,13 +143,13 @@ function App() {
                 )}
 
                 {/* 3. Main Content Area */}
-                {/* pb-20 adds padding at bottom so content isn't hidden behind BottomNav on mobile */}
                 <main className="container mx-auto px-4 py-6 flex-grow pb-24 md:pb-8">
                   <React.Suspense fallback={<LoadingSpinner />}>
                     <Routes>
                       {/* Public Routes */}
                       <Route path="/login" element={<Login />} />
                       <Route path="/register" element={<Register />} />
+                      <Route path="/forgot-password" element={<ForgotPassword />} /> {/* ✅ Added Route */}
 
                       {/* 🚜 FARMER ROUTES */}
                       <Route path="/farmer/*" element={
@@ -195,10 +208,10 @@ function App() {
                   </React.Suspense>
                 </main>
 
-                {/* 4. Bottom Navigation (Visible only on Mobile) */}
+                {/* 4. Bottom Navigation */}
                 <BottomNav />
 
-                {/* 5. Install PWA Button (Positioned above BottomNav) */}
+                {/* 5. Install PWA Button */}
                 <InstallPWA />
 
               </div>

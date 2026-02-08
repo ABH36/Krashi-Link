@@ -3,6 +3,7 @@ const AuditLog = require('../models/AuditLog');
 const jwt = require('jsonwebtoken');
 const { ERROR_CODES } = require('../config/constants');
 const sendNotification = require('../utils/notificationHelper');
+const OTPService = require('../services/otpService'); // ✅ Added OTP Service
 
 // Generate JWT Token
 const generateToken = (userId) => {
@@ -39,10 +40,21 @@ exports.register = async (req, res) => {
         'info'
     );
 
+    // 🚜 GENERATE OTP FOR VERIFICATION (New Logic)
+    const otp = OTPService.generateOTP();
+    await OTPService.storeOTP(user._id, 'verification', otp); // Store internally
+    
+    // Send SMS (Hybrid: Terminal + Real)
+    await OTPService.sendOTP(phone, otp, 'Registration');
+
     res.status(201).json({
       success: true,
       message: "User Registered Successfully",
-      user: user.toJSON()
+      data: {
+        user: user.toJSON(),
+        // ✅ SEND OTP IN RESPONSE (For Frontend Alert)
+        test_otp: otp 
+      }
     });
 
   } catch (error) {
@@ -232,5 +244,65 @@ exports.verify2FA = async (req, res) => {
         message: 'Internal server error while verifying 2FA'
       }
     });
+  }
+};
+
+// 4. Forgot Password - Send OTP
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { phone } = req.body;
+
+    const user = await User.findOne({ phone });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found with this phone number' });
+    }
+
+    // Generate OTP
+    const otp = OTPService.generateOTP();
+    // Store OTP with specific type 'reset_password'
+    await OTPService.storeOTP(user._id, 'reset_password', otp);
+
+    // Send SMS (Hybrid)
+    await OTPService.sendOTP(phone, otp, 'Password Reset');
+
+    res.json({
+      success: true,
+      message: 'OTP sent successfully',
+      // ✅ TEST OTP IN RESPONSE
+      test_otp: otp 
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+// 5. Reset Password - Verify OTP & Update Password
+exports.resetPassword = async (req, res) => {
+  try {
+    const { phone, otp, newPassword } = req.body;
+
+    const user = await User.findOne({ phone });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Verify OTP
+    const otpResult = OTPService.verifyOTP(user._id, 'reset_password', otp);
+    if (!otpResult.valid) {
+      return res.status(400).json({ success: false, message: 'Invalid or Expired OTP' });
+    }
+
+    // Update Password
+    // Note: User model ka 'pre save' hook password ko apne aap hash kar dega
+    user.password = newPassword;
+    await user.save();
+
+    res.json({ success: true, message: 'Password reset successfully. Please login.' });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Server Error' });
   }
 };

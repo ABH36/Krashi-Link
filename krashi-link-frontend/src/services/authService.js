@@ -1,28 +1,14 @@
 import api from './api';
 
 export const authService = {
-  // Register new user
-  register: (userData) => {
-    return api.post('/auth/register', userData);
-  },
+  register: (userData) => api.post('/auth/register', userData),
+  login: (phone, password) => api.post('/auth/login', { phone, password }),
+  getMe: () => api.get('/auth/me'),
+  
+  // ✅ NEW: Forgot & Reset Password
+  forgotPassword: (phone) => api.post('/auth/forgot-password', { phone }),
+  resetPassword: (phone, otp, newPassword) => api.post('/auth/reset-password', { phone, otp, newPassword }),
 
-  // Login user
-  login: (phone, password) => {
-    return api.post('/auth/login', { phone, password });
-  },
-
-  // Get current user profile
-  getMe: () => {
-    return api.get('/auth/me');
-  },
-
-  // Send 2FA code
-  send2FA: (channel) => {
-    return api.post('/auth/2fa/send', { channel });
-  },
-
-  // Verify 2FA code
-  verify2FA: (code) => {
-    return api.post('/auth/2fa/verify', { code });
-  }
+  send2FA: (channel) => api.post('/auth/2fa/send', { channel }),
+  verify2FA: (code) => api.post('/auth/2fa/verify', { code })
 };

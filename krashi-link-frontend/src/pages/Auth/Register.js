@@ -16,7 +16,7 @@ import {
 } from '@heroicons/react/24/outline';
 
 const Register = () => {
-  // ✅ login function bhi nikala context se (Auto-login ke liye)
+  // login function bhi nikala context se (Auto-login ke liye)
   const { register, login, logout, loading, error, clearError } = useAuth();
   const { isHindi } = useLocale();
   const { t } = useTranslation();
@@ -76,7 +76,15 @@ const Register = () => {
     const regResult = await register(registerData);
     
     if (regResult && regResult.success) {
-        // ✅ FIX: Auto-Login immediately after Register
+        
+        // 🚨 SHOW TEST OTP ALERT 🚨
+        // Backend se jo 'test_otp' aaya hai use screen par dikhao
+        const testOtp = regResult.data?.test_otp || regResult.test_otp;
+        if (testOtp) {
+            alert(`🚜 DEVELOPMENT MODE: Your Verification OTP is ${testOtp}`);
+        }
+
+        // ✅ Auto-Login immediately after Register
         // Agar backend register ke sath token nahi bhejta, to ye step token le aayega
         const loginResult = await login(formData.phone, formData.password);
 
