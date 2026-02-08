@@ -1,8 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-    ArrowLeft, LockClosedIcon, ShieldCheckIcon, 
-    EyeIcon, ServerIcon, EnvelopeIcon, LanguageIcon 
+    ArrowLeftIcon, // ✅ Changed from ArrowLeft
+    LockClosedIcon, 
+    ShieldCheckIcon, 
+    EyeIcon, 
+    ServerIcon, 
+    EnvelopeIcon, 
+    LanguageIcon 
 } from '@heroicons/react/24/outline';
 
 const PrivacySecurity = () => {
@@ -74,7 +79,7 @@ const PrivacySecurity = () => {
             onClick={() => navigate(-1)} 
             className="p-2 bg-gray-100 text-gray-600 rounded-full hover:bg-green-50 hover:text-green-600 transition-colors"
             >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeftIcon className="w-5 h-5" />
             </button>
             <h1 className="font-bold text-gray-800 text-lg flex items-center gap-2">
                 <ShieldCheckIcon className="w-5 h-5 text-green-600" />
@@ -123,7 +128,7 @@ const PrivacySecurity = () => {
               ))}
           </div>
 
-          {/* Contact Section (As requested) */}
+          {/* Contact Section */}
           <div className="mt-10 bg-gradient-to-br from-green-600 to-emerald-700 rounded-2xl p-6 text-white shadow-lg shadow-green-200">
               <h3 className="font-bold text-xl mb-2 flex items-center gap-2">
                   <EnvelopeIcon className="w-6 h-6" /> {t.contactTitle}

@@ -1,73 +1,84 @@
 import React from 'react';
-import { 
-    ArrowLeft, ShieldCheck, LayoutDashboard, MapPin, 
-    CalendarDays, Clock, CurrencyRupeeIcon, 
-    Users, Sprout, Code, Zap, Database, Tractor
-} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { 
+    ArrowLeftIcon, 
+    MagnifyingGlassCircleIcon, // Search
+    MapPinIcon,          // Location Range
+    TruckIcon,           // Machines
+    ShieldCheckIcon,     // OTP
+    ClockIcon,           // Live Timer
+    BanknotesIcon,       // Hybrid Payment
+    ChartBarIcon,        // History
+    SparklesIcon         // Success
+} from '@heroicons/react/24/outline';
 
 const About = () => {
   const navigate = useNavigate();
 
-  // --- 🚜 KRISHILINK SYSTEM ARCHITECTURE ---
+  // --- 🚜 KRISHILINK POWERFUL FLOW ---
   const flowNodes = [
       { 
         id: 1, 
-        label: 'Secure Entry (Hybrid OTP)', 
-        icon: ShieldCheck, 
-        color: 'bg-emerald-500', 
+        label: 'Smart Search Engine', 
+        desc: 'खेती की कोई भी मशीन ढूंढें—ट्रैक्टर, हार्वेस्टर, रोटावेटर या ड्रोन।',
+        icon: MagnifyingGlassCircleIcon, 
+        color: 'bg-blue-500', 
         connectTo: [2] 
       },
       { 
         id: 2, 
-        label: 'Role Based Access', 
-        desc: 'Farmer & Machine Owner Ecosystem',
-        icon: Users, 
-        color: 'bg-blue-600', 
+        label: 'Local Range Finder', 
+        desc: 'GPS तकनीक से सिर्फ आपके गाँव या सेट की गई रेंज (km) में उपलब्ध मशीनें देखें।',
+        icon: MapPinIcon, 
+        color: 'bg-red-500', 
+        size: 'large', // Highlight Location Feature
         connectTo: [3] 
       },
       { 
         id: 3, 
-        label: 'Geo-Location Engine', 
-        desc: 'Finding machines nearby',
-        icon: MapPin, 
-        color: 'bg-red-500', 
-        size: 'large', 
-        connectTo: [4, 5] 
+        label: 'Transparent Booking', 
+        desc: 'सीधे मालिक से जुड़ें। किराया और शर्तें पहले से साफ।',
+        icon: TruckIcon, 
+        color: 'bg-orange-500', 
+        connectTo: [4] 
       },
       { 
         id: 4, 
-        label: 'Machine Listing & Mgmt', 
-        icon: Tractor, 
-        color: 'bg-orange-500', 
-        connectTo: [6] 
+        label: 'OTP Verified Work', 
+        desc: 'काम शुरू और खत्म करने के लिए डिजिटल OTP। कोई धोखाधड़ी नहीं।',
+        icon: ShieldCheckIcon, 
+        color: 'bg-emerald-600', 
+        connectTo: [5] 
       },
       { 
         id: 5, 
-        label: 'Smart Booking System', 
-        icon: CalendarDays, 
-        color: 'bg-purple-500', 
+        label: 'Live Work Timer', 
+        desc: 'घड़ी के हिसाब से पाई-पाई का हिसाब। (Minute-based calculation).',
+        icon: ClockIcon, 
+        color: 'bg-purple-600', 
+        size: 'large', // Highlight Timer Feature
         connectTo: [6] 
       },
       { 
         id: 6, 
-        label: 'Live Work Timer', 
-        desc: 'Fair billing based on real usage',
-        icon: Clock, 
-        color: 'bg-indigo-500', 
-        size: 'large', 
+        label: 'Hybrid Payments', 
+        desc: 'अपनी मर्जी से भुगतान करें: नकद (Cash) दें या ऑनलाइन (UPI/Wallet)।',
+        icon: BanknotesIcon, 
+        color: 'bg-green-600', 
+        size: 'large', // Highlight Hybrid Payment
         connectTo: [7] 
       },
       { 
         id: 7, 
-        label: 'Transparent Payments', 
-        icon: CurrencyRupeeIcon, 
-        color: 'bg-green-600', 
+        label: 'Digital Khata (History)', 
+        desc: 'हर बुकिंग और भुगतान का डिजिटल रिकॉर्ड हमेशा के लिए सुरक्षित।',
+        icon: ChartBarIcon, 
+        color: 'bg-indigo-500', 
         connectTo: [8] 
       },
       { 
         id: 8, 
-        label: 'Rural Prosperity', 
+        label: 'Kisan Ki Jeet', 
         isLogo: true, 
         color: 'bg-white', 
         connectTo: [] 
@@ -87,24 +98,24 @@ const About = () => {
           onClick={() => navigate(-1)} 
           className="p-2.5 bg-slate-50 text-slate-600 rounded-full hover:bg-green-50 hover:text-green-600 transition-all border border-slate-200 active:scale-95 shadow-sm"
         >
-          <ArrowLeft className="w-5 h-5" />
+          <ArrowLeftIcon className="w-5 h-5" />
         </button>
-        <h2 className="text-lg font-extrabold text-slate-800 tracking-tight">System Architecture</h2>
+        <h2 className="text-lg font-extrabold text-slate-800 tracking-tight">Platform Features</h2>
       </div>
 
       <div className="max-w-3xl mx-auto p-6 pb-32">
         
         {/* Intro Section */}
         <div className="text-center mb-16 mt-8 animate-[fadeIn_0.5s_ease-out]">
-            <h1 className="text-4xl md:text-5xl font-black text-slate-800 mb-4 tracking-tight">
-                Inside <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-emerald-500">KrishiLink.</span>
+            <h1 className="text-3xl md:text-5xl font-black text-slate-800 mb-4 tracking-tight">
+                Technology for <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-emerald-500">Real India.</span>
             </h1>
             <p className="text-slate-500 max-w-lg mx-auto text-sm md:text-base leading-relaxed font-medium">
-                Bridging the gap between machinery owners and farmers. A transparent, tech-driven marketplace for rural India.
+                KrishiLink सिर्फ एक ऐप नहीं है, यह खेती को आसान बनाने का एक औजार है। मशीन ढूंढने से लेकर भुगतान तक—सब कुछ आपकी शर्तों पर।
             </p>
         </div>
 
-        {/* 🌳 THE VISUAL TREE STRUCTURE */}
+        {/* 🌳 THE VISUAL FEATURES TREE */}
         <div className="relative border-l-2 border-green-200/60 ml-4 md:ml-10 pl-8 md:pl-12 space-y-12">
             
             {flowNodes.map((node, index) => (
@@ -125,10 +136,10 @@ const About = () => {
                     `}>
                         <div className="flex items-center gap-5">
                             {/* Icon Box */}
-                            <div className={`p-3.5 rounded-xl ${node.isLogo ? 'bg-transparent' : 'bg-slate-50 border border-slate-100'} text-white shadow-sm`}>
+                            <div className={`p-3.5 rounded-xl shrink-0 ${node.isLogo ? 'bg-transparent' : 'bg-slate-50 border border-slate-100'} text-white shadow-sm`}>
                                 {node.isLogo ? (
                                     <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center shadow-lg shadow-green-500/30">
-                                        <Sprout size={24} className="text-white" />
+                                        <SparklesIcon className="w-6 h-6 text-white" />
                                     </div>
                                 ) : (
                                     <node.icon className={`
@@ -144,10 +155,10 @@ const About = () => {
                                     {node.label}
                                 </h3>
                                 {node.desc && (
-                                    <p className="text-slate-500 text-xs mt-1">{node.desc}</p>
+                                    <p className="text-slate-500 text-sm mt-1 font-medium">{node.desc}</p>
                                 )}
                                 {node.size === 'large' && (
-                                    <p className="text-green-600 text-[10px] font-bold uppercase tracking-widest mt-1 bg-green-100 w-fit px-2 py-0.5 rounded-full">
+                                    <p className="text-green-600 text-[10px] font-bold uppercase tracking-widest mt-2 bg-green-100 w-fit px-2 py-0.5 rounded-full">
                                         Core Feature
                                     </p>
                                 )}
@@ -164,14 +175,14 @@ const About = () => {
 
         </div>
 
-        {/* 👨‍💻 DEVELOPER SECTION */}
+        {/* 👨‍💻 DEVELOPER / MISSION SECTION */}
         <div className="mt-32 relative group animate-[fadeIn_0.8s_ease-out]" style={{ animationDelay: '0.5s' }}>
             
             <div className="bg-white border border-slate-100 rounded-[2rem] p-8 md:p-12 relative overflow-hidden shadow-2xl shadow-green-900/5">
                  
                  {/* Background Decoration */}
                  <div className="absolute right-0 top-0 opacity-5">
-                     <Code className="w-64 h-64 -mr-16 -mt-16 transform rotate-12 text-green-900" />
+                     <TruckIcon className="w-64 h-64 -mr-16 -mt-16 transform rotate-12 text-green-900" />
                  </div>
                  <div className="absolute bottom-0 left-0 w-full h-2 bg-gradient-to-r from-green-400 via-emerald-500 to-teal-500"></div>
 
@@ -194,33 +205,19 @@ const About = () => {
 
                      <div className="text-center md:text-left">
                          <h3 className="text-xs font-bold text-green-600 tracking-[0.2em] uppercase mb-2 flex items-center justify-center md:justify-start gap-2">
-                            <Zap size={14} fill="currentColor" /> Architect & Founder
+                            <SparklesIcon className="w-4 h-4" /> Founder & Developer
                          </h3>
                          <h2 className="text-3xl font-black text-slate-800 mb-4">Abhishek Jain</h2>
                          <p className="text-slate-500 leading-relaxed text-sm md:text-base font-medium">
-                             Building the digital backbone for Indian Agriculture.
-                             <br className="hidden md:block"/>
-                             "KrishiLink connects the hardworking farmer with the technology they need to thrive."
+                             "Technology is best when it brings people together. KrishiLink is designed to create a transparent, profitable, and fair ecosystem for both Indian Farmers and Machine Owners."
                          </p>
-                         
-                         <div className="flex gap-3 mt-6 justify-center md:justify-start flex-wrap">
-                            <span className="px-4 py-1.5 rounded-full bg-slate-100 border border-slate-200 text-xs font-bold text-slate-600 flex items-center gap-1">
-                                <Database size={12}/> MERN Stack
-                            </span>
-                            <span className="px-4 py-1.5 rounded-full bg-slate-100 border border-slate-200 text-xs font-bold text-slate-600 flex items-center gap-1">
-                                <LayoutDashboard size={12}/> PWA
-                            </span>
-                            <span className="px-4 py-1.5 rounded-full bg-slate-100 border border-slate-200 text-xs font-bold text-slate-600 flex items-center gap-1">
-                                <ShieldCheck size={12}/> Secure Auth
-                            </span>
-                         </div>
                      </div>
                  </div>
             </div>
         </div>
 
         <div className="text-center text-slate-400 text-[10px] uppercase tracking-[0.2em] mt-16 font-bold">
-           v1.0 • System Operational • Made in India
+           Made with ❤️ for Indian Agriculture
         </div>
 
       </div>

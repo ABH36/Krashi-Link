@@ -41,4 +41,4 @@ const SplashScreen = () => {
   );
 };
 
-export default SplashScreen;About.jsx
+export default SplashScreen;

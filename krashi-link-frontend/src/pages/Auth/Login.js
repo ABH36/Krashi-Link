@@ -10,7 +10,9 @@ import {
   LockClosedIcon, 
   EyeIcon, 
   EyeSlashIcon,
-  SparklesIcon 
+  SparklesIcon,
+  InformationCircleIcon, // ✅ New Icon
+  ShieldCheckIcon        // ✅ New Icon
 } from '@heroicons/react/24/outline';
 
 const Login = () => {
@@ -24,7 +26,6 @@ const Login = () => {
     password: ''
   });
 
-  // NEW: State for toggling password visibility
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
@@ -125,7 +126,7 @@ const Login = () => {
                   <input
                     id="password"
                     name="password"
-                    type={showPassword ? "text" : "password"} // Dynamic Type
+                    type={showPassword ? "text" : "password"}
                     required
                     className="input-field pl-10 pr-10 py-3 rounded-xl focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 transition-all shadow-sm"
                     placeholder="••••••••"
@@ -178,6 +179,20 @@ const Login = () => {
                 </Link>
               </span>
             </div>
+
+            {/* ✅ NEW: Info Links at Bottom of Card */}
+            <div className="mt-6 border-t border-gray-100 pt-4 flex justify-center items-center gap-6">
+                <Link to="/about" className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 hover:text-green-600 transition-colors group">
+                    <InformationCircleIcon className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                    About Us
+                </Link>
+                <div className="w-1 h-1 bg-gray-300 rounded-full"></div>
+                <Link to="/privacy" className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 hover:text-green-600 transition-colors group">
+                    <ShieldCheckIcon className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                    Privacy & Security
+                </Link>
+            </div>
+
           </form>
         </div>
       </div>
