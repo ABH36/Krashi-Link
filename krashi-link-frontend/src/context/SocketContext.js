@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import io from 'socket.io-client';
+import { useAuth } from './AuthContext'; // Agar AuthContext use karna ho to, warna localStorage thik hai
 
 const SocketContext = createContext();
 
@@ -17,6 +18,8 @@ export const SocketProvider = ({ children }) => {
   const [connectionError, setConnectionError] = useState(null);
 
   useEffect(() => {
+    let newSocket = null;
+
     const connectSocket = () => {
       const token = localStorage.getItem('token');
       const user = JSON.parse(localStorage.getItem('user'));
@@ -24,13 +27,18 @@ export const SocketProvider = ({ children }) => {
       if (token && user) {
         console.log('🔌 Connecting socket for user:', user.id, 'Role:', user.role);
         
-        const SOCKET_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
-        
-        const newSocket = io(SOCKET_URL, {
+        // ✅ CHANGE: Added support for REACT_APP_SOCKET_URL (For Vercel)
+        const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5000';
+        console.log("🌐 Socket Target URL:", SOCKET_URL);
+
+        newSocket = io(SOCKET_URL, {
           auth: {
             token: token
           },
-          transports: ['websocket', 'polling'],
+          transports: ['websocket', 'polling'], // Faster connection
+          withCredentials: true,                // CORS cookies/headers support
+          reconnection: true,                   // Auto reconnect ON
+          reconnectionAttempts: 5,
           timeout: 10000
         });
 
@@ -40,7 +48,7 @@ export const SocketProvider = ({ children }) => {
           setConnectionError(null);
         });
 
-        // Farmer-specific events
+        // 🚜 Farmer-specific events (KEPT AS IS)
         if (user.role === 'farmer') {
           newSocket.on('booking_confirmed', (data) => {
             console.log('🎯 Farmer: Booking confirmed by owner', data);
@@ -59,7 +67,7 @@ export const SocketProvider = ({ children }) => {
           });
         }
 
-        // Owner-specific events
+        // 🚜 Owner-specific events (KEPT AS IS)
         if (user.role === 'owner') {
           newSocket.on('booking_request', (data) => {
             console.log('🎯 Owner: New booking request', data);
@@ -74,12 +82,12 @@ export const SocketProvider = ({ children }) => {
           });
         }
 
-        // Common events for all roles
+        // 🔄 Common events for all roles
         newSocket.on('booking_updated', (data) => {
           console.log('🔄 Booking updated:', data);
         });
 
-        // Debug events
+        // 🛠️ Debug events
         newSocket.on('test_response', (data) => {
           console.log('✅ Test response:', data);
         });
@@ -95,11 +103,11 @@ export const SocketProvider = ({ children }) => {
           setIsConnected(false);
           setConnectionError(error.message);
           
-          // Auto-reconnect after 5 seconds
-          setTimeout(() => {
-            console.log('🔄 Attempting to reconnect...');
-            connectSocket();
-          }, 5000);
+          // Note: Socket.io has built-in reconnection, but keeping your manual retry logic as requested
+          // setTimeout(() => {
+          //   console.log('🔄 Attempting to reconnect...');
+          //   connectSocket(); 
+          // }, 5000);
         });
 
         newSocket.on('error', (error) => {
@@ -109,17 +117,21 @@ export const SocketProvider = ({ children }) => {
 
         setSocket(newSocket);
 
-        return () => {
-          console.log('🧹 Cleaning up socket connection');
-          newSocket.disconnect();
-        };
       } else {
         console.log('⏭️ No user token found, skipping socket connection');
       }
     };
 
     connectSocket();
-  }, []);
+
+    // Cleanup function
+    return () => {
+      if (newSocket) {
+        console.log('🧹 Cleaning up socket connection');
+        newSocket.disconnect();
+      }
+    };
+  }, []); // Run once on mount
 
   const joinBookingRoom = (bookingId) => {
     if (socket && isConnected) {
@@ -140,7 +152,7 @@ export const SocketProvider = ({ children }) => {
   const testConnection = () => {
     if (socket && isConnected) {
       const user = JSON.parse(localStorage.getItem('user'));
-      if (user.role === 'owner') {
+      if (user && user.role === 'owner') {
         socket.emit('test_owner_connection', { timestamp: Date.now() });
       } else {
         socket.emit('test_farmer_connection', { timestamp: Date.now() });
