@@ -16,8 +16,6 @@ import {
   ShieldCheckIcon, 
   MapPinIcon, 
   PhoneIcon,
-  EyeIcon,
-  ArrowPathIcon,
   TruckIcon
 } from '@heroicons/react/24/outline';
 
@@ -25,6 +23,7 @@ const RequestItem = ({ request, onUpdate, onRefresh }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [actionLoading, setActionLoading] = useState(false);
+  // eslint-disable-next-line
   const [showOTP, setShowOTP] = useState(false);
   const [showArrivalOTPModal, setShowArrivalOTPModal] = useState(false);
   const [verifyArrivalLoading, setVerifyArrivalLoading] = useState(false);
@@ -50,7 +49,7 @@ const RequestItem = ({ request, onUpdate, onRefresh }) => {
       
       let reason = '';
       if (!accept) {
-        reason = prompt('Reason for rejection:'); // Keep prompt for simplicity or use a modal
+        reason = prompt('Reason for rejection:'); // Keep prompt for simplicity
         if (!reason) { setActionLoading(false); return; }
       }
 
@@ -266,19 +265,22 @@ const RequestItem = ({ request, onUpdate, onRefresh }) => {
          {renderActionButtons()}
       </div>
 
-      {/* OTP Modal */}
-      <OTPModal
-        isOpen={showArrivalOTPModal}
-        onClose={() => setShowArrivalOTPModal(false)}
-        onVerify={handleVerifyArrival}
-        onResend={handleResendOTP}
-        type="arrival"
-        loading={verifyArrivalLoading}
-        autoRead={true}
-        phoneNumber={request.farmerId?.phone}
-      />
+      {/* OTP Modal - ✅ FIXED: Auto-reset by conditional rendering */}
+      {showArrivalOTPModal && (
+          <OTPModal
+            isOpen={showArrivalOTPModal}
+            onClose={() => setShowArrivalOTPModal(false)}
+            onVerify={handleVerifyArrival}
+            onResend={handleResendOTP}
+            type="arrival"
+            loading={verifyArrivalLoading}
+            autoRead={true}
+            phoneNumber={request.farmerId?.phone}
+          />
+      )}
     </div>
     
+    {/* ✅ Toast kept intact */}
     {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </>
   );

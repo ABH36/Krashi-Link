@@ -4,7 +4,6 @@ import { useSocket } from '../../context/SocketContext';
 import bookingService from '../../services/bookingService';
 import RequestItem from '../../components/owner/RequestItem';
 import Loader from '../../components/common/Loader';
-import Button from '../../components/common/Button';
 import { 
   InboxIcon, 
   ArchiveBoxIcon, 
@@ -16,15 +15,16 @@ const Requests = () => {
   const { t } = useTranslation();
   const { socket, isConnected } = useSocket();
   
-  const [allRequests, setAllRequests] = useState([]); // Store ALL here
+  const [allRequests, setAllRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('pending');
+  // eslint-disable-next-line
   const [pagination, setPagination] = useState({ page: 1, limit: 100, total: 0 });
 
   useEffect(() => {
     fetchRequests();
     setupSocketListeners();
-  }, []);
+  }, []); // eslint-disable-line
 
   const fetchRequests = async () => {
     try {
@@ -42,7 +42,7 @@ const Requests = () => {
 
   const setupSocketListeners = () => {
     if (!socket) return;
-    socket.on('booking_request', () => fetchRequests()); // Re-fetch on new request
+    socket.on('booking_request', () => fetchRequests());
     socket.on('booking_confirmed_owner', () => fetchRequests());
     return () => {
       socket.off('booking_request');
@@ -50,7 +50,6 @@ const Requests = () => {
     };
   };
 
-  // --- ⚡ CLIENT SIDE FILTERING (Fast UX) ---
   const getFilteredRequests = () => {
     switch(activeTab) {
         case 'pending': return allRequests.filter(r => r.status === 'requested');
@@ -66,7 +65,6 @@ const Requests = () => {
     setAllRequests(prev => prev.map(req => req._id === bookingId ? { ...req, ...updateData } : req));
   };
 
-  // Stats for Tabs
   const counts = {
       pending: allRequests.filter(r => r.status === 'requested').length,
       active: allRequests.filter(r => ['owner_confirmed', 'arrived_otp_verified', 'in_progress'].includes(r.status)).length,
@@ -78,7 +76,6 @@ const Requests = () => {
   return (
     <div className="space-y-6 animate-[fadeIn_0.3s_ease-out]">
       
-      {/* 🟢 Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
            <h1 className="text-2xl font-bold text-gray-900">Rental Requests</h1>
@@ -90,7 +87,6 @@ const Requests = () => {
         </div>
       </div>
 
-      {/* 🎛️ Tabs (Pill Style) */}
       <div className="flex bg-gray-100 p-1 rounded-xl overflow-x-auto no-scrollbar">
           {[
               { id: 'pending', label: 'New Requests', icon: ClockIcon, count: counts.pending },
@@ -117,7 +113,6 @@ const Requests = () => {
           ))}
       </div>
 
-      {/* 📋 Requests List */}
       <div className="space-y-4">
         {displayedRequests.length === 0 ? (
             <div className="text-center py-20 bg-white rounded-xl border border-gray-200 border-dashed">

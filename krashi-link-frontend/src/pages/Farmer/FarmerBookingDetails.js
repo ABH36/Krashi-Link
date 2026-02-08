@@ -12,8 +12,6 @@ import {
   UserIcon, 
   DevicePhoneMobileIcon, 
   MapPinIcon, 
-  CurrencyRupeeIcon,
-  CheckCircleIcon
 } from '@heroicons/react/24/outline';
 
 const FarmerBookingDetails = () => {
@@ -58,20 +56,54 @@ const FarmerBookingDetails = () => {
   const displayContact = isOwner ? booking.farmerId : booking.ownerId;
   const backLink = isOwner ? '/owner/requests' : '/farmer/bookings';
 
-  // --- 🚦 PROGRESS BAR LOGIC ---
   const steps = ['requested', 'owner_confirmed', 'arrived_otp_verified', 'completed_pending_payment', 'paid'];
   const currentStepIndex = steps.indexOf(booking.status) > -1 ? steps.indexOf(booking.status) : 0;
+
+  // --- 🔐 OTP DISPLAY LOGIC (THE FIX) ---
+  const renderOTPBanner = () => {
+      // SCENARIO 1: STARTING JOB (Arrival)
+      // Rule: OTP dikhega Farmer ko -> Farmer dega Owner ko.
+      if (!isOwner && booking.status === 'owner_confirmed' && booking.otp?.arrivalOTP) {
+          return (
+              <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6 flex items-center justify-between shadow-sm animate-pulse">
+                  <div>
+                      <h3 className="font-bold text-green-800 text-lg">Start Job OTP</h3>
+                      <p className="text-green-600 text-sm">Share this code with the machine owner</p>
+                  </div>
+                  <div className="bg-white px-4 py-2 rounded-lg border-2 border-green-500 text-2xl font-mono font-bold text-green-700 tracking-widest">
+                      {booking.otp.arrivalOTP}
+                  </div>
+              </div>
+          );
+      }
+
+      // SCENARIO 2: ENDING JOB (Completion)
+      // Rule: OTP dikhega Owner ko -> Owner dega Farmer ko.
+      if (isOwner && booking.status === 'arrived_otp_verified' && booking.otp?.completionOTP) {
+          return (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 flex items-center justify-between shadow-sm animate-pulse">
+                  <div>
+                      <h3 className="font-bold text-red-800 text-lg">End Job OTP</h3>
+                      <p className="text-red-600 text-sm">Share this code with the farmer to stop timer</p>
+                  </div>
+                  <div className="bg-white px-4 py-2 rounded-lg border-2 border-red-500 text-2xl font-mono font-bold text-red-700 tracking-widest">
+                      {booking.otp.completionOTP}
+                  </div>
+              </div>
+          );
+      }
+
+      return null;
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 py-6 animate-[fadeIn_0.3s_ease-out]">
       <div className="max-w-3xl mx-auto px-4">
         
-        {/* Back Button */}
         <Link to={backLink} className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-green-600 mb-4 transition-colors">
           <ArrowLeftIcon className="w-4 h-4 mr-1" /> Back
         </Link>
 
-        {/* 🚨 Priority Alert Banner */}
         {booking.status === 'completed_pending_payment' && (
             <div className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded-r-lg mb-6 shadow-sm flex items-start justify-between">
                 <div>
@@ -91,7 +123,9 @@ const FarmerBookingDetails = () => {
             </div>
         )}
 
-        {/* Header Card */}
+        {/* ✅ SHOW OTP HERE */}
+        {renderOTPBanner()}
+
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
             <div className="flex justify-between items-start">
                 <div>
@@ -105,7 +139,6 @@ const FarmerBookingDetails = () => {
                 </span>
             </div>
 
-            {/* Progress Bar */}
             <div className="mt-8 relative">
                 <div className="absolute top-1/2 left-0 w-full h-1 bg-gray-200 -z-10 rounded"></div>
                 <div 
@@ -123,10 +156,8 @@ const FarmerBookingDetails = () => {
             </div>
         </div>
 
-        {/* 🧩 Content Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             
-            {/* Contact Card */}
             <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
                 <div className="flex items-center gap-3 mb-4">
                     <div className="p-2 bg-blue-50 rounded-full text-blue-600">
@@ -155,7 +186,6 @@ const FarmerBookingDetails = () => {
                 </div>
             </div>
 
-            {/* Schedule & Billing */}
             <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
                 <div className="flex items-center gap-3 mb-4">
                     <div className="p-2 bg-purple-50 rounded-full text-purple-600">
@@ -185,7 +215,6 @@ const FarmerBookingDetails = () => {
             </div>
         </div>
 
-        {/* 👇 Action Center (The Main Engine) */}
         <div className="mt-6">
             <FarmerBookingActions 
                 booking={booking} 

@@ -9,47 +9,53 @@ const { ERROR_CODES } = require('../config/constants');
 
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
-// 👇 MASTER FORMULA (Isi ko Frontend match karega)
+// 👇 MASTER FORMULA (Billing Logic)
 const calculateBilling = (scheme, rate, durationMinutes, areaBigha) => {
   let amount = 0;
   
-  // Ensure duration is rounded UP to nearest minute (1.1 min = 2 min)
+  // Ensure duration is rounded UP to nearest minute
   const roundedMinutes = Math.ceil(durationMinutes);
 
   if (scheme === 'area') {
     amount = rate * (areaBigha || 1);
   } else if (scheme === 'hourly' || scheme === 'time') {
-    // Rate is Per Hour. Calculate Per Minute rate.
     const ratePerMinute = rate / 60;
     amount = roundedMinutes * ratePerMinute;
   } else if (scheme === 'daily') {
-    // Daily rate logic (Minimum 1 day)
     const days = Math.ceil(roundedMinutes / (60 * 24));
     amount = rate * days;
   }
 
-  // Round final amount to nearest integer and enforce Minimum ₹10
   return Math.max(10, Math.ceil(amount));
 };
 
-const getOTPErrorMessage = (reason) => 'OTP verification failed';
-
 exports.debugUser = async (req, res) => res.json({ success: true, data: { userId: req.user.id } });
 
+// 1. Get Owner Bookings
 exports.getOwnerBookings = async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
     const skip = (page - 1) * limit;
     const machines = await Machine.find({ ownerId: req.user.id });
+    
     const bookings = await Booking.find({ machineId: { $in: machines.map(m => m._id) } })
       .populate('machineId farmerId')
       .skip(skip).limit(parseInt(limit)).sort({ createdAt: -1 });
     
+    // ✅ SECURITY FIX: Hide Arrival OTP from Owner list
+    // Owner ko list mein OTP dikhne ki jarurat nahi hai, Farmer batayega
+    const sanitizedBookings = bookings.map(b => {
+        const obj = b.toObject();
+        if (obj.otp) delete obj.otp.arrivalOTP; 
+        return obj;
+    });
+    
     const total = await Booking.countDocuments({ machineId: { $in: machines.map(m => m._id) } });
-    res.json({ success: true, data: { bookings, pagination: { total } } });
+    res.json({ success: true, data: { bookings: sanitizedBookings, pagination: { total } } });
   } catch (e) { res.status(500).json({ success: false }); }
 };
 
+// 2. Create Booking
 exports.createBooking = async (req, res) => {
   try {
     const { machineId, requestedStartAt, billingScheme, areaBigha } = req.body;
@@ -73,6 +79,7 @@ exports.createBooking = async (req, res) => {
   } catch (e) { res.status(500).json({ success: false }); }
 };
 
+// 3. Confirm Booking
 exports.confirmBooking = async (req, res) => {
   try {
     const { accept, arrivalDeadlineMinutes } = req.body;
@@ -88,18 +95,21 @@ exports.confirmBooking = async (req, res) => {
         await booking.save();
         OTPService.storeOTP(booking._id, 'arrival', arrivalOTP);
         
-        io.to(booking.farmerId.toString()).emit('booking_confirmed', { bookingId: booking._id });
-        sendNotification(io, booking.farmerId, 'Booking Confirmed', 'Owner accepted request', 'success');
+        // ✅ Send OTP ONLY to Farmer via Socket
+        io.to(booking.farmerId.toString()).emit('booking_confirmed', { bookingId: booking._id, arrivalOTP });
+        sendNotification(io, booking.farmerId, 'Booking Confirmed', 'Owner accepted. Share OTP to start.', 'success');
     } else {
         booking.status = 'cancelled';
         await booking.save();
         io.to(booking.farmerId.toString()).emit('booking_rejected', { bookingId: booking._id });
         sendNotification(io, booking.farmerId, 'Booking Rejected', 'Owner rejected request', 'error');
     }
+    // Response mein OTP nahi bhej rahe owner ko
     res.json({ success: true, data: { status: booking.status } });
   } catch (e) { res.status(500).json({ success: false }); }
 };
 
+// 4. Verify Arrival (Start Work)
 exports.verifyArrival = async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id);
@@ -118,20 +128,33 @@ exports.verifyArrival = async (req, res) => {
 
     const eventData = { bookingId: booking._id, startedAt: booking.timer.startedAt };
     const io = req.app.get('io');
+    
+    // Farmer gets timer start event
     io.to(booking.farmerId.toString()).emit('timer_started', eventData);
-    io.to(booking.ownerId.toString()).emit('timer_started', eventData);
+    
+    // ✅ Owner gets timer start AND Completion OTP (to stop later)
+    io.to(booking.ownerId.toString()).emit('timer_started', { ...eventData, completionOTP });
     sendNotification(io, booking.farmerId, 'Work Started', 'Timer has started', 'info');
 
-    res.json({ success: true, data: { status: booking.status, timer: booking.timer } });
+    // Send Completion OTP in response so Owner sees it immediately
+    res.json({ 
+        success: true, 
+        data: { 
+            status: booking.status, 
+            timer: booking.timer,
+            otp: { completionOTP } 
+        } 
+    });
   } catch (e) { res.status(500).json({ success: false }); }
 };
 
-// 👇 VERIFY COMPLETION with Strict Math
+// 5. Verify Completion (End Work)
 exports.verifyCompletion = async (req, res) => {
   try {
     const { otp } = req.body;
     const booking = await Booking.findById(req.params.id);
 
+    // ✅ Only Farmer can verify completion (enter OTP provided by Owner)
     if (booking.farmerId.toString() !== req.user.id.toString()) {
         return res.status(403).json({ success: false, message: 'Access Denied' });
     }
@@ -141,14 +164,9 @@ exports.verifyCompletion = async (req, res) => {
 
     const stoppedAt = new Date();
     const durationMs = stoppedAt - new Date(booking.timer.startedAt);
-    
-    // Step 1: Calculate Minutes (Round UP) - Example 61sec = 2min
-    // Use floating point first for exactness
     const rawMinutes = durationMs / 60000;
-    // Ensure at least 1 minute is charged if started
     const durationMinutes = Math.max(1, rawMinutes);
 
-    // Step 2: Calculate Bill using Master Formula
     const calculatedAmount = calculateBilling(
         booking.billing.scheme, 
         booking.billing.rate, 
@@ -156,7 +174,6 @@ exports.verifyCompletion = async (req, res) => {
         booking.billing.areaBigha
     );
 
-    // Save rounded minutes for display
     const displayMinutes = Math.ceil(durationMinutes);
 
     booking.status = 'completed_pending_payment';
@@ -187,13 +204,13 @@ exports.resendOTP = async (req, res) => {
     try {
         const newOTP = generateOTP();
         OTPService.storeOTP(req.params.id, req.body.type, newOTP);
-        console.log(`🔄 RESENT OTP: ${newOTP}`);
-        if (req.body.type === 'completion') {
-             const b = await Booking.findById(req.params.id);
-             b.otp.completionOTP = newOTP;
-             await b.save();
-        }
-        res.json({ success: true, message: 'Resent' });
+        
+        const booking = await Booking.findById(req.params.id);
+        if (req.body.type === 'completion') booking.otp.completionOTP = newOTP;
+        if (req.body.type === 'arrival') booking.otp.arrivalOTP = newOTP;
+        await booking.save();
+
+        res.json({ success: true, message: 'Resent', data: { otp: newOTP } });
     } catch (e) { res.status(500).json({ success: false }); }
 };
 
@@ -203,14 +220,31 @@ exports.getUserBookings = async (req, res) => {
     res.json({ success: true, data: { bookings } });
 };
 
+// 👇 CRITICAL: Safe Get Booking By ID
 exports.getBookingById = async (req, res) => {
     const booking = await Booking.findById(req.params.id).populate('machineId ownerId farmerId');
     if (!booking) return res.status(404).json({ success: false });
+    
     const uid = req.user.id.toString();
     if(booking.farmerId._id.toString() !== uid && booking.ownerId._id.toString() !== uid && req.user.role !== 'admin') {
         return res.status(403).json({ success: false });
     }
-    res.json({ success: true, data: { booking } });
+
+    // ✅ FIX: SECURITY SANITIZATION (OTP Swap Logic)
+    let safeBooking = booking.toObject();
+
+    if (req.user.role === 'farmer') {
+        // Farmer sees Arrival OTP (to start job)
+        // Farmer does NOT see Completion OTP (Owner has it)
+        if (safeBooking.otp) delete safeBooking.otp.completionOTP;
+    } 
+    else if (req.user.role === 'owner') {
+        // Owner does NOT see Arrival OTP (Farmer has it)
+        // Owner sees Completion OTP (to stop job)
+        if (safeBooking.otp) delete safeBooking.otp.arrivalOTP;
+    }
+
+    res.json({ success: true, data: { booking: safeBooking } });
 };
 
 exports.cancelBooking = async (req, res) => {

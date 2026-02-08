@@ -3,57 +3,90 @@ const Booking = require('../models/Booking');
 const AuditLog = require('../models/AuditLog');
 const { ERROR_CODES } = require('../config/constants');
 
-// 1. Create new machine
+// 1. Create new machine (FIXED: Handles FormData & Validation Errors)
 exports.createMachine = async (req, res) => {
   try {
     console.log('📨 CREATE MACHINE REQUEST:', req.body);
-    console.log('📸 FILE:', req.file); // Debug log
     
-    // Parse FormData fields (req.body mein Strings aate hain FormData se)
-    let { type, name, model, pricing, location, meta, description, rate, unit, addressText } = req.body;
+    // FormData se alag-alag fields nikalo (Raw Data)
+    let { 
+        type, name, model, description,
+        rate, unit, scheme,             // Pricing Fields
+        addressText, lat, lng,          // Location Fields
+        condition, fuelType, year,      // Meta Fields
+        meta, pricing, location         // JSON Strings (agar frontend JSON bheje)
+    } = req.body;
 
-    // ✅ FIX: Construct Pricing Object manually if coming from FormData
-    if (!pricing && rate && unit) {
-        pricing = { rate: Number(rate), unit: unit };
+    // --- ✅ STEP 1: Construct Pricing Object ---
+    let pricingObj = {};
+    if (pricing && typeof pricing === 'string') {
+        pricingObj = JSON.parse(pricing);
+    } else {
+        // Validation Fix: Default 'scheme' to 'time' (hour) if missing
+        pricingObj = { 
+            rate: rate ? Number(rate) : 0, 
+            unit: unit || 'hour', 
+            scheme: scheme || 'time' 
+        };
     }
 
-    // ✅ FIX: Construct Location Object manually if coming from FormData
-    if (!location && addressText) {
-        location = { addressText: addressText, coordinates: [] }; // Coordinates baad mein add kar sakte hain
+    // --- ✅ STEP 2: Construct Location Object ---
+    let locationObj = {};
+    if (location && typeof location === 'string') {
+        locationObj = JSON.parse(location);
+    } else {
+        // Validation Fix: Default lat/lng to 0 if missing (To bypass Mongoose validation)
+        const latitude = lat ? Number(lat) : 0;
+        const longitude = lng ? Number(lng) : 0;
+        
+        locationObj = { 
+            addressText: addressText || '',
+            lat: latitude,
+            lng: longitude,
+            coordinates: [longitude, latitude] // GeoJSON format [lng, lat]
+        };
     }
 
-    // Handle JSON parsing if they came as strings (FormData limitations)
-    if (typeof pricing === 'string') pricing = JSON.parse(pricing);
-    if (typeof location === 'string') location = JSON.parse(location);
+    // --- ✅ STEP 3: Construct Meta Object ---
+    let metaObj = {};
+    if (meta && typeof meta === 'string') {
+        try { metaObj = JSON.parse(meta); } catch(e) { metaObj = {}; }
+    } else {
+        metaObj = {
+            condition: condition || 'good',
+            fuelType: fuelType || 'diesel',
+            year: year
+        };
+    }
 
-    if (!type || !name || !pricing) {
+    // Validation Check
+    if (!type || !name || !pricingObj.rate) {
       return res.status(400).json({
         success: false,
-        error: { code: 'VAL_400', message: 'Missing required fields (Name, Type, Pricing)' }
+        error: { code: 'VAL_400', message: 'Missing required fields (Name, Type, Rate)' }
       });
     }
 
-    // ✅ IMAGE HANDLING
+    // --- ✅ STEP 4: Image Handling ---
     let imageUrl = '';
     if (req.file) {
-        // Create full URL for the uploaded image
         const protocol = req.protocol;
         const host = req.get('host');
         imageUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
     }
 
+    // Create Machine
     const machine = await Machine.create({
       ownerId: req.user.id,
       type,
       name,
       model,
-      pricing,
-      location,
-      description, // Added description support
-      // Store single image in 'image' field (string) or array if your model supports it
+      description,
+      pricing: pricingObj,   // ✅ Fixed Object
+      location: locationObj, // ✅ Fixed Object
       image: imageUrl, 
-      images: imageUrl ? [imageUrl] : [], // Backward compatibility
-      meta: meta || {}
+      images: imageUrl ? [imageUrl] : [],
+      meta: metaObj          // ✅ Fixed Object
     });
 
     const io = req.app.get('io');
@@ -67,7 +100,11 @@ exports.createMachine = async (req, res) => {
 
   } catch (error) {
     console.error('❌ CREATE MACHINE ERROR:', error);
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ 
+        success: false, 
+        message: error.message || 'Machine creation failed',
+        error: error.errors // Details for debugging
+    });
   }
 };
 
@@ -135,7 +172,7 @@ exports.getMachineById = async (req, res) => {
   }
 };
 
-// 4. Update machine
+// 4. Update machine (FIXED: Handles FormData Partial Updates)
 exports.updateMachine = async (req, res) => {
   try {
     const machine = await Machine.findById(req.params.id);
@@ -145,33 +182,55 @@ exports.updateMachine = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Access Denied' });
     }
 
-    // Extract fields including flat fields from FormData
-    const { rate, unit, addressText, ...otherUpdates } = req.body;
+    // Extract FormData fields
+    const { 
+        rate, unit, scheme, 
+        addressText, lat, lng, 
+        condition, fuelType, year,
+        ...otherUpdates 
+    } = req.body;
+    
     let updates = { ...otherUpdates };
 
-    // Handle Pricing update
-    if (rate || unit) {
+    // ✅ Handle Pricing Update
+    if (rate || unit || scheme) {
         updates.pricing = {
             rate: rate ? Number(rate) : machine.pricing.rate,
-            unit: unit || machine.pricing.unit
+            unit: unit || machine.pricing.unit,
+            scheme: scheme || machine.pricing.scheme // Preserve existing scheme if not provided
         };
     }
 
-    // Handle Location update
-    if (addressText) {
+    // ✅ Handle Location Update
+    if (addressText || lat || lng) {
+        const newLat = lat ? Number(lat) : machine.location.lat;
+        const newLng = lng ? Number(lng) : machine.location.lng;
+        
         updates.location = {
-            ...machine.location,
-            addressText: addressText
+            addressText: addressText || machine.location.addressText,
+            lat: newLat,
+            lng: newLng,
+            coordinates: (newLat && newLng) ? [newLng, newLat] : machine.location.coordinates
         };
     }
 
-    // ✅ HANDLE IMAGE UPDATE
+    // ✅ Handle Meta Update
+    if (condition || fuelType || year) {
+        updates.meta = {
+            ...machine.meta, // Keep existing meta
+            condition: condition || machine.meta?.condition,
+            fuelType: fuelType || machine.meta?.fuelType,
+            year: year || machine.meta?.year
+        };
+    }
+
+    // ✅ Handle Image Update
     if (req.file) {
         const protocol = req.protocol;
         const host = req.get('host');
         const imageUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
         updates.image = imageUrl;
-        updates.images = [imageUrl]; // Keep legacy support
+        updates.images = [imageUrl]; 
     }
 
     const allowedUpdates = ['name', 'model', 'pricing', 'location', 'image', 'images', 'meta', 'maintenance', 'availability', 'description', 'type'];
@@ -191,7 +250,7 @@ exports.updateMachine = async (req, res) => {
   }
 };
 
-// 5. Delete machine -> NO CHANGE
+// 5. Delete machine (Existing Logic) -> NO CHANGE
 exports.deleteMachine = async (req, res) => {
   try {
     const machine = await Machine.findById(req.params.id);
