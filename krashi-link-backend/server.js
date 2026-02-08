@@ -35,7 +35,12 @@ connectDB();
 // Render Variable se allow list banayega
 const allowedOrigins = process.env.CORS_ALLOWED_ORIGINS 
   ? process.env.CORS_ALLOWED_ORIGINS.split(',') 
-  : ['http://localhost:3000', 'http://localhost:5000'];
+  : [
+      'http://localhost:3000', 
+      'http://localhost:5000',
+      'https://krashi-link.vercel.app', // 👈 Vercel Link Hardcoded as Backup
+      'https://krashi-link.vercel.app/' // With slash backup
+    ];
 
 console.log("🔒 Allowed Origins:", allowedOrigins); // Render Logs me dikhega ki kaun allow hai
 
