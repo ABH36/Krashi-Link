@@ -26,28 +26,36 @@ const sanitize = require('./src/middlewares/sanitize');
 const { generalLimiter, authLimiter, otpLimiter } = require('./src/middlewares/rateLimit');
 
 const app = express();
+
+// 🛑 FIX FOR RATE LIMIT ERROR (Very Important for Render)
+// Render ek proxy ke peeche chalta hai, isliye ye line jaruri hai
+app.set('trust proxy', 1); 
+
 const server = http.createServer(app);
 
 // ✅ Connect to Database
 connectDB();
 
-// ✅ SECURITY: CORS Origin Logic
-// Render Variable se allow list banayega
-const allowedOrigins = process.env.CORS_ALLOWED_ORIGINS 
-  ? process.env.CORS_ALLOWED_ORIGINS.split(',') 
-  : [
-      'http://localhost:3000', 
-      'http://localhost:5000',
-      'https://krashi-link.vercel.app', // 👈 Vercel Link Hardcoded as Backup
-      'https://krashi-link.vercel.app/' // With slash backup
-    ];
+// ✅ CORS Configuration (Hardcoded for Safety)
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5000',
+  'https://krashi-link.vercel.app',  // No slash
+  'https://krashi-link.vercel.app/'  // With slash
+];
 
-console.log("🔒 Allowed Origins:", allowedOrigins); // Render Logs me dikhega ki kaun allow hai
+// Add Environment Variable Origins if they exist
+if (process.env.CORS_ALLOWED_ORIGINS) {
+  const envOrigins = process.env.CORS_ALLOWED_ORIGINS.split(',');
+  allowedOrigins.push(...envOrigins);
+}
 
-// ✅ Socket.io Setup (Secure)
+console.log("🔒 Allowed Origins:", allowedOrigins);
+
+// ✅ Socket.io Setup
 const io = socketIo(server, {
   cors: {
-    origin: allowedOrigins, // Ab sirf Vercel aur Localhost connect kar payenge
+    origin: allowedOrigins,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     credentials: true
   }
@@ -65,14 +73,14 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Security Middleware
 app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" } // Images ko Vercel par load hone deta hai
+  crossOriginResourcePolicy: { policy: "cross-origin" } 
 }));
 app.use(compression());
 
-// ✅ Express CORS Setup (Secure)
+// ✅ Express CORS Setup
 app.use(cors({
   origin: (origin, callback) => {
-    // !origin allow karta hai mobile apps ya server-to-server calls ko
+    // !origin allows mobile apps/postman/server-to-server calls
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -84,10 +92,10 @@ app.use(cors({
 }));
 
 // Apply rate limiting
+// Ab 'trust proxy' set hone ke baad ye error nahi dega
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 app.use('/api/bookings/*/verify-*', otpLimiter);
-// app.use('/api/', generalLimiter); // Commented temporarily
 
 // Logging
 app.use(morgan('combined'));
@@ -120,7 +128,6 @@ app.use(errorHandler);
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err, promise) => {
   console.log('Unhandled Rejection at:', promise, 'reason:', err);
-  // server.close(() => process.exit(1));
 });
 
 const PORT = process.env.PORT || 5000;
