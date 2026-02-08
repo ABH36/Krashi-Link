@@ -12,5 +12,6 @@ root.render(
   </React.StrictMode>
 );
 
-// Enable PWA service worker in production
-serviceWorkerRegistration.register();
+// 🛑 FIX: Change register() to unregister() to stop MIME type error
+// Jab hum future me PWA setup karenge tab ise wapis register() kar denge
+serviceWorkerRegistration.unregister();
