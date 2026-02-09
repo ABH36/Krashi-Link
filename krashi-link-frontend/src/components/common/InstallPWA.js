@@ -1,83 +1,151 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowDownTrayIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon, XMarkIcon, ShareIcon, EllipsisVerticalIcon } from '@heroicons/react/24/outline';
 
 const InstallPWA = () => {
-  const [supportsPWA, setSupportsPWA] = useState(false);
-  const [promptInstall, setPromptInstall] = useState(null);
-  const [isDismissed, setIsDismissed] = useState(false); // Session dismiss check
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+  const [showInstructions, setShowInstructions] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
 
   useEffect(() => {
-    // Handler function
+    // 1. Check if App is already installed (Standalone mode)
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+    if (isStandalone) {
+      setIsInstalled(true);
+      return; // Agar pehle se app hai to button mat dikhao
+    }
+
+    // 2. Detect iOS (iPhone/iPad)
+    const userAgent = window.navigator.userAgent.toLowerCase();
+    setIsIOS(/iphone|ipad|ipod/.test(userAgent));
+
+    // 3. Capture the Android Install Prompt
     const handler = (e) => {
-      console.log("📢 PWA Install Event Triggered!"); // Debugging ke liye
       e.preventDefault();
-      setSupportsPWA(true);
-      setPromptInstall(e);
+      setDeferredPrompt(e);
+      // Debug: Console me check kar sakte hain
+      console.log("✅ Install Prompt Captured!");
     };
 
-    // Event Listener add karna
     window.addEventListener('beforeinstallprompt', handler);
 
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
-  const handleInstallClick = (e) => {
-    e.preventDefault();
-    if (!promptInstall) {
-        console.error("❌ No install prompt available");
-        return;
+  const handleInstallClick = () => {
+    // Case A: Agar Chrome ka automatic prompt ready hai (Android)
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then((choiceResult) => {
+        if (choiceResult.outcome === 'accepted') {
+          console.log('User accepted the install prompt');
+          setDeferredPrompt(null);
+          setIsInstalled(true);
+        }
+      });
+    } 
+    // Case B: Agar prompt nahi hai (iOS ya Chrome ne prompt block kiya hai)
+    else {
+      setShowInstructions(true);
     }
-    
-    promptInstall.prompt();
-    
-    promptInstall.userChoice.then((choiceResult) => {
-      if (choiceResult.outcome === 'accepted') {
-        console.log('✅ User accepted the install prompt');
-        setSupportsPWA(false); // Button chhupa do install ke baad
-      } else {
-        console.log('❌ User dismissed the install prompt');
-      }
-      setPromptInstall(null);
-    });
   };
 
-  const handleDismiss = () => {
-    setIsDismissed(true);
-    console.log("User dismissed the PWA popup for this session");
-  };
-
-  // Agar support nahi hai ya user ne close kar diya hai to kuch mat dikhao
-  if (!supportsPWA || isDismissed) {
-    return null; 
-  }
+  // Agar app installed hai, to kuch mat dikhao
+  if (isInstalled) return null;
 
   return (
-    <div className="fixed bottom-24 left-4 right-4 z-50 md:bottom-6 md:right-6 md:left-auto md:w-auto animate-[slideUp_0.5s_ease-out]">
-      <div className="bg-white/90 backdrop-blur-md border border-green-100 p-1.5 rounded-2xl shadow-2xl flex items-center gap-2">
-        
-        {/* Install Button */}
-        <button
-          onClick={handleInstallClick}
-          className="flex items-center justify-center flex-1 px-5 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:shadow-lg hover:shadow-green-200 transition-all active:scale-95 group"
-        >
-          <ArrowDownTrayIcon className="w-5 h-5 mr-2 animate-bounce" />
-          <div className="text-left">
-            <span className="block font-bold text-sm leading-none">Install App</span>
-            <span className="text-[10px] opacity-90 font-medium">Get better experience</span>
-          </div>
-        </button>
+    <>
+      {/* --- MAIN INSTALL BUTTON (Hamesha Dikhega) --- */}
+      <div className="fixed bottom-20 left-4 right-4 z-40 md:bottom-6 md:right-6 md:left-auto md:w-auto animate-bounce-slow">
+        <div className="bg-green-600 text-white p-1 rounded-xl shadow-2xl border-2 border-green-400 flex items-center justify-between">
+          
+          <button
+            onClick={handleInstallClick}
+            className="flex-1 flex items-center px-4 py-3 gap-3"
+          >
+            <div className="bg-white/20 p-2 rounded-full">
+              <ArrowDownTrayIcon className="w-6 h-6 text-white animate-pulse" />
+            </div>
+            <div className="text-left">
+              <span className="block font-bold text-lg leading-none">Install App</span>
+              <span className="text-xs text-green-100 font-medium">किसान ऐप डाउनलोड करें</span>
+            </div>
+          </button>
 
-        {/* Close Button */}
-        <button 
-          onClick={handleDismiss}
-          className="p-3 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors border border-transparent hover:border-red-100"
-          aria-label="Close"
-        >
-          <XMarkIcon className="w-5 h-5" />
-        </button>
-
+          {/* Close (X) Button */}
+          <button 
+            onClick={() => setIsInstalled(true)} // Temporary dismiss
+            className="p-3 hover:bg-green-700 rounded-lg transition-colors"
+          >
+            <XMarkIcon className="w-5 h-5 text-green-200" />
+          </button>
+        </div>
       </div>
-    </div>
+
+      {/* --- INSTRUCTION MODAL (Agar Direct Install na ho) --- */}
+      {showInstructions && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl relative">
+            
+            <button 
+              onClick={() => setShowInstructions(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+            >
+              <XMarkIcon className="w-6 h-6" />
+            </button>
+
+            <h3 className="text-xl font-bold text-gray-900 mb-2">
+              App कैसे इनस्टॉल करें?
+            </h3>
+            
+            <p className="text-gray-600 mb-6 text-sm">
+              आपके फ़ोन में ऐप डाउनलोड करने के लिए नीचे दिए गए स्टेप्स फॉलो करें:
+            </p>
+
+            {isIOS ? (
+              // iOS (iPhone) Instructions
+              <div className="space-y-4">
+                <div className="flex items-center gap-4 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                  <ShareIcon className="w-6 h-6 text-blue-500" />
+                  <span className="text-gray-700 font-medium text-sm">
+                    1. नीचे <b>Share</b> बटन दबाएं
+                  </span>
+                </div>
+                <div className="flex items-center gap-4 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                  <div className="w-6 h-6 bg-gray-200 rounded flex items-center justify-center font-bold text-gray-600">+</div>
+                  <span className="text-gray-700 font-medium text-sm">
+                    2. <b>"Add to Home Screen"</b> चुनें
+                  </span>
+                </div>
+              </div>
+            ) : (
+              // Android Instructions
+              <div className="space-y-4">
+                <div className="flex items-center gap-4 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                  <EllipsisVerticalIcon className="w-6 h-6 text-gray-600" />
+                  <span className="text-gray-700 font-medium text-sm">
+                    1. ऊपर तीन डॉट्स <b>(Menu)</b> पर क्लिक करें
+                  </span>
+                </div>
+                <div className="flex items-center gap-4 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                  <ArrowDownTrayIcon className="w-6 h-6 text-green-600" />
+                  <span className="text-gray-700 font-medium text-sm">
+                    2. <b>"Install App"</b> या <b>"Add to Home Screen"</b> दबाएं
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <button 
+              onClick={() => setShowInstructions(false)}
+              className="mt-6 w-full bg-green-600 text-white py-3 rounded-xl font-bold shadow-lg shadow-green-200"
+            >
+              समझ गया (Got it)
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 
