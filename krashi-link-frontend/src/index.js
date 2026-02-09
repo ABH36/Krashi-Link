@@ -12,6 +12,6 @@ root.render(
   </React.StrictMode>
 );
 
-// 🛑 FIX: Change register() to unregister() to stop MIME type error
-// Jab hum future me PWA setup karenge tab ise wapis register() kar denge
-serviceWorkerRegistration.unregister();
+// ✅ FIX: Changed unregister() to register()
+// Ab aapka PWA (Offline Mode + Install Button) chalu ho jayega
+serviceWorkerRegistration.register();
